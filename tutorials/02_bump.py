@@ -60,19 +60,6 @@ LES_MeanFlow = h5f['MeanFlow'][:] # Mean flow fields
 LES_MeanGrad = h5f['MeanGrad'][:] # Velocity gradients
 h5f.close()
 
-# fill in zero for uw and vw
-LES_TurbStat = np.concatenate((LES_TurbStat, np.zeros(shape=[LES_TurbStat.shape[0], 2])), axis=1)
-
-# fill in zero for w and mu_t
-LES_MeanFlow = np.concatenate((LES_MeanFlow[:,0:4], 
-                               np.zeros(shape=[LES_MeanFlow.shape[0], 2])), axis=1)
-
-# fill in zero for dudz,dvdz,dwdx,dwdy,dwdz
-LES_MeanGrad = np.concatenate((LES_MeanGrad[:,0:2], 
-                               np.zeros(shape=[LES_MeanGrad.shape[0], 1]),
-                               LES_MeanGrad[:,2:4], 
-                               np.zeros(shape=[LES_MeanGrad.shape[0], 4])), axis=1)
-
 # Sec. 1 end time
 end_sec1 = time.time()
 
@@ -170,7 +157,8 @@ sel_idx_LES = (np.abs(LES_Grid[:,0]-xloc)<eps)&(LES_Grid[:,1]<=ymax)&(LES_Grid[:
 fig31 = TurbAna.plot_Lumley_tri()
 
 # plot LES data
-plt.scatter(LES_RST.LumleyTriCoor[sel_idx_LES,0], LES_RST.LumleyTriCoor[sel_idx_LES,1], label='LES', 
+LES_coors = LES_RST.LumleyTriCoor()
+plt.scatter(LES_coors[sel_idx_LES,0], LES_coors[sel_idx_LES,1], label='LES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -195,7 +183,8 @@ sel_idx_LES = (np.abs(LES_Grid[:,0]-xloc)<eps)&(LES_Grid[:,1]<=ymax)&(LES_Grid[:
 fig32 = TurbAna.plot_turb_tri()
 
 # plot LES data
-plt.scatter(LES_RST.TurbTriCoor[sel_idx_LES,0], LES_RST.TurbTriCoor[sel_idx_LES,1], label='LES', 
+LES_coors = LES_RST.TurbTriCoor()
+plt.scatter(LES_coors[sel_idx_LES,0], LES_coors[sel_idx_LES,1], label='LES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -220,7 +209,8 @@ sel_idx_LES = (np.abs(LES_Grid[:,0]-xloc)<eps)&(LES_Grid[:,1]<=ymax)&(LES_Grid[:
 fig33 = TurbAna.plot_bary_tri()
 
 # plot LES data
-plt.scatter(LES_RST.BaryTriCoor[sel_idx_LES,0], LES_RST.BaryTriCoor[sel_idx_LES,1], label='LES', 
+LES_coors = LES_RST.BaryTriCoor()
+plt.scatter(LES_coors[sel_idx_LES,0], LES_coors[sel_idx_LES,1], label='LES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -275,9 +265,10 @@ print('--------------------------------------'    )
 start_sec4 = time.time()
 
 # main function
-LES_Mean = TurbAna.MeanFlowField(LES_MeanFlow, LES_MeanGrad)
+LES_Mean = TurbAna.MeanFlowField(LES_MeanFlow)
+LES_Grad = TurbAna.MeanGradField(LES_MeanGrad)
 S_ref = 300
-[LES_EddyViscCal, LES_EddyViscFlag] = TurbAna.calc_EddyVisc(LES_RST,LES_Mean,S_ref=S_ref)
+[LES_EddyViscCal, LES_EddyViscFlag] = TurbAna.calc_EddyVisc(LES_RST,LES_Grad,S_ref=S_ref)
 
 # Sec. 4 end time
 end_sec4 = time.time()

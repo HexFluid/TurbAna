@@ -40,39 +40,35 @@ import h5py
 import os
 
 current_path = os.getcwd() # assuming Python launched in the 'TurbAna' dir
-data_path    = os.path.join(current_path,'tutorials','bstep_data','bstep_DDES.h5')
+data_path    = os.path.join(current_path,'tutorials','bstep_data','bstep_DNS.h5')
 
 h5f  = h5py.File(data_path,'r')
-data = h5f['data'][:]        # flow field data
+Grid = h5f['grid'][:]         # grid point coordinates
+TurbStat = h5f['TurbStat'][:] # Reynolds stress components
 h5f.close()
 ```
 
 ### Step 4: Calculate and visualize turbulence anisotropy
-Run the following script to obtain SPOD results:
+Run the following script to visualize turbulence anisotropy in the barycentric map:
 ```python
-import spod
+import TurbAna
+import matplotlib.pyplot as plt
 
-spod.spod(data,dt,current_path,weight='default',nOvlp='default',window='default',method='fast')
+sel_idx = (Grid[:,0]==4)&(Grid[:,1]<=1) # selected profile at x/H=4
+RST = TurbAna.ReynoldsStressTensor(TurbStat[sel_idx,:]) # Reynolds stress tensor
+coors = RST.BaryTriCoor() # Barycentric map coordinates: xB and yB
+RGB = RST.AniRGB() # RGB color values from turbulence anisotropy eigenvalues
 
-SPOD_LPf  = h5py.File(os.path.join(current_path,'SPOD_LPf.h5'),'r') # load data from h5 format
-L = SPOD_LPf['L'][:,:]    # modal energy E(f, M)
-P = SPOD_LPf['P'][:,:,:]  # mode shape
-f = SPOD_LPf['f'][:]      # frequency
-SPOD_LPf.close()
-```
-
-### Step 5: Calculate and visualize turbulence anisotropy
-Finally, run the following script to visualize the SPOD spectrum:
-```python
-fig = spod.plot_spectrum(f,L,hl_idx=5)
+fig = TurbAna.plot_bary_tri()
+plt.scatter(coors[:,0], coors[:,1], facecolors=RGB, zorder=0)
 ```
 
 Expected results:
 <p align="left">
-    <img alt="Illustration of SPOD workflow" src="docs/figs/SPOD_quickstart_result.png" width="400" />
+    <img alt="Quick start bary map" src="docs/figs/quickstart_result.png" width="300" />
 </p>
 
-For more postprocess tutorials including plotting mode shapes and reconstructed flow fields, please refer to the scripts with detailed comments in [tutorials](./tutorials/README.md).
+For more postprocess tutorials including plotting turbulence anisotropy contours and turbulent viscosity, please refer to the scripts with detailed comments in [tutorials](./tutorials/README.md).
 
 
 

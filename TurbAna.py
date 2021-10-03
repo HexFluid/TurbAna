@@ -25,26 +25,45 @@ from scipy import linalg
 # main classes
 class MeanFlowField:
     '''
+    Purpose: class of mean flow field
+        
     Parameters
     ----------
     MeanFlow: 2D numpy array, float.
               nrow = ngrid (number of grid)
-              ncol = nvar (e.g., p, T, u, v, w, mut)
-    MeanGrad: 2D numpy array, float.
-              nrow = ngrid (number of grid)
-              ncol = nvar (e.g., dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz)              
+              ncol = nvar (e.g., p, T, u, v, w, mut)           
     '''
-    def __init__(self, MeanFlow=np.ones([1,6]), MeanGrad=np.ones([1,9])):
+    
+    def __init__(self, MeanFlow=np.ones([1,6])):
+        try:
+            [ngrid, nvar] = MeanFlow.shape
+            self.ngrid = ngrid
+            self.nvar  = nvar
+            
+            if nvar == 4: # 2D data with p, T, u, v
+                print('Initialize MeanFlowField using 2D data...')
+                MeanFlow = np.concatenate((MeanFlow, np.zeros(shape=[ngrid, 2])), axis=1)
+            elif nvar == 5: # 2D data with p, T, u, v, mut
+                print('Initialize MeanFlowField using 2D data...')
+                MeanFlow = np.concatenate((MeanFlow, np.zeros(shape=[ngrid, 1])), axis=1)                
+            elif nvar == 6: # 3D data with p, T, u, v, w, mut
+                print('Initialize MeanFlowField using 3D data...')
+            else:
+                raise ValueError
+                
+        except:
+            raise ValueError('Wrong data type: please use 2D numpy array with ncol = 4 or 9 for MeanFlowField')
+
+        # initialize values
         self.p = MeanFlow[:,0]
         self.T = MeanFlow[:,1] 
         self.Velocity = MeanFlow[:,2:5]
         self.EddyVisc = MeanFlow[:,5]
         self.LamVisc  = self.CalcLamVisc
         self.Density  = self.CalcDensity
-        self.MeanGrad = MeanGrad
         
     def __str__(self):
-        return("Mean flow field of %.i grid points."%(self.MeanFlow.shape[0]))
+        return("Mean flow field of %.i grid points."%(self.ngrid))
     
     @property
     def CalcLamVisc(self):
@@ -59,34 +78,125 @@ class MeanFlowField:
     
     @property
     def CalcDensity(self):
+        '''
+        Purpose: calculate air density using the ideal gas equation
+        '''
         R=287        
         rho = self.p/R/self.T
         return(rho)
+
+
+class MeanGradField:
+    '''
+    Purpose: class of mean gradient field
+        
+    Parameters
+    ----------
+    MeanGrad: 2D numpy array, float.
+              nrow = ngrid (number of grid)
+              ncol = nvar (e.g., dudx, dudy, dvdx, dvdy for 2D;
+                           dudx, dudy, dudz, dvdx, dvdy, dvdz, dwdx, dwdy, dwdz for 3D)
+    '''
     
+    def __init__(self, MeanGrad=np.ones([1,9])):
+        try:
+            [ngrid, nvar] = MeanGrad.shape
+            self.ngrid = ngrid
+            self.nvar  = nvar
+            
+            if nvar == 4: # 2D data with uu,vv,ww,uv
+                print('Initialize MeanGradField using 2D data...')
+                MeanGrad = np.concatenate((MeanGrad[:,0:2],np.zeros(shape=[ngrid, 1]),
+                                           MeanGrad[:,2:4],np.zeros(shape=[ngrid, 4])), axis=1)
+            elif nvar == 9: # 3D data with 
+                print('Initialize MeanGradField using 3D data...')
+            else:
+                raise ValueError
+                
+        except:
+            raise ValueError('Wrong data type: please use 2D numpy array with ncol = 4 or 9 for MeanGradField')
+
+        # initialize values
+        self.VelGrad = MeanGrad
+        self.StrainRate = self.CalcStrainRate
+        self.Vorticity  = self.CalcVorticity
+        
+    def __str__(self):
+        return("Mean gradient field of %.i grid points."%(self.ngrid))
+
+    @property
+    def CalcStrainRate(self):
+        '''
+        Purpose: calculate strain rate tensor components (Sxx, Syy, Szz, Sxy, Sxz, Syz)
+        '''
+        Sxx = self.VelGrad[:,0]
+        Syy = self.VelGrad[:,4]
+        Szz = self.VelGrad[:,8]
+        Sxy = 0.5*(self.VelGrad[:,1]+self.VelGrad[:,3])
+        Sxz = 0.5*(self.VelGrad[:,2]+self.VelGrad[:,6])
+        Syz = 0.5*(self.VelGrad[:,5]+self.VelGrad[:,7])
+        S   = (np.array([Sxx,Syy,Szz,Sxy,Sxz,Syz])).T
+        return(S)
+
+    @property
+    def CalcVorticity(self):
+        '''
+        Purpose: calculate vorticity tensor components (Oxy, Oxz, Oyz)
+        '''
+        Oxy = 0.5*(self.VelGrad[:,1]-self.VelGrad[:,3])
+        Oxz = 0.5*(self.VelGrad[:,2]-self.VelGrad[:,6])
+        Oyz = 0.5*(self.VelGrad[:,5]-self.VelGrad[:,7])
+        O   = (np.array([Oxy,Oxz,Oyz])).T
+        return(O)
     
 class ReynoldsStressTensor:
     '''
+    Purpose: class of Reynolds stress tensor
+        
     Parameters
     ----------
     tau_ij: 2D numpy array, float.
             nrow = ngrid (number of grid)
-            ncol = nvar (e.g., uu,vv,ww,uv,uw,vw)           
+            ncol = nvar (e.g., uu,vv,ww,uv for 2D; uu,vv,ww,uv,uw,vw for 3D)           
     '''
+    
     def __init__(self, tau_ij=np.ones([1,6])):
+        try:
+            [ngrid, nvar] = tau_ij.shape
+            self.ngrid = ngrid
+            self.nvar  = nvar
+            
+            if nvar == 4: # 2D data with uu,vv,ww,uv
+                print('Initialize ReynoldsStressTensor using 2D data...')
+                tau_ij = np.concatenate((tau_ij, np.zeros(shape=[ngrid, 2])), axis=1)
+            elif nvar == 6: # 3D data with 
+                print('Initialize ReynoldsStressTensor using 3D data...')
+            else:
+                raise ValueError
+                
+        except:
+            raise ValueError('Wrong data type: please use 2D numpy array with ncol = 4 or 6 for ReynoldsStressTensor')
+            
         self.Components = tau_ij
         self.TKE = self.CalcTKE
         self.AnisotropyEigenVal = self.CalcAnisotropyEigenVal
         
     def __str__(self):
-        return("Reynolds stress tensors of %.i grid points."%(self.Components.shape[0]))
+        return("Reynolds stress tensors of %.i grid points."%(self.ngrid))
     
     @property
     def CalcTKE(self):
+        '''
+        Purpose: calculate turbulence kinetic energy
+        '''        
         k = np.sum(self.Components[:,0:3], axis=1)/2
         return(k)
     
     @property
     def CalcAnisotropyTensor(self):
+        '''
+        Purpose: calculate turbulence anisotropy tensor
+        '''
         k = self.TKE
         k[k<=0] = 1e-9 # avoid division by zero
         a_ij = self.Components/2/np.reshape(k, newshape=(-1,1))
@@ -95,6 +205,9 @@ class ReynoldsStressTensor:
     
     @property
     def CalcAnisotropyEigenVal(self):
+        '''
+        Purpose: calculate eigenvalues of turbulence anisotropy tensor
+        '''
         a_ij = self.CalcAnisotropyTensor
         EigenVals = []
         EigenVal_flags = [] # flags used for debug
@@ -124,6 +237,9 @@ class ReynoldsStressTensor:
         return(np.array(EigenVals))
 
     def LumleyTriCoor(self):
+        '''
+        Purpose: calculate turbulence data coordinates in Lumley triangle
+        '''        
         EigenVals = self.AnisotropyEigenVal
         PC2 = EigenVals[:,0]**2 + EigenVals[:,1]**2 + EigenVals[:,0]*EigenVals[:,1]
         PC3 = -EigenVals[:,0]*EigenVals[:,1]*(EigenVals[:,0] + EigenVals[:,1])
@@ -131,6 +247,9 @@ class ReynoldsStressTensor:
         return(PCs)
         
     def TurbTriCoor(self):
+        '''
+        Purpose: calculate turbulence data coordinates in turbulence triangle
+        '''  
         EigenVals = self.AnisotropyEigenVal
         xi  = cubic_root((-EigenVals[:,0]*EigenVals[:,1]*(EigenVals[:,0]+EigenVals[:,1]))/2)
         eta = ((EigenVals[:,0]**2 + EigenVals[:,1]**2 + EigenVals[:,0]*EigenVals[:,1])/3)**0.5
@@ -138,6 +257,9 @@ class ReynoldsStressTensor:
         return(corrs)
         
     def BaryTriCoor(self):
+        '''
+        Purpose: calculate turbulence data coordinates in barycentric map
+        '''  
         EigenVals = self.AnisotropyEigenVal
         xB = EigenVals[:,0]-EigenVals[:,1]+(3*EigenVals[:,2]+1)/2
         yB = (3*EigenVals[:,2]+1)*np.sqrt(3)/2
@@ -145,6 +267,9 @@ class ReynoldsStressTensor:
         return(coors)
 
     def AniRGB(self,c_off=0.65,c_exp=5):
+        '''
+        Purpose: calculate RGB values from eigenvalues of turbulence anisotropy tensor
+        '''  
         EigenVals = self.AnisotropyEigenVal
         R = (EigenVals[:,0]-EigenVals[:,1]+c_off)**c_exp
         G = (2*(EigenVals[:,1]-EigenVals[:,2])+c_off)**c_exp
@@ -179,7 +304,7 @@ def cubic_root(data):
     root=root.reshape(data_shape)
     return root
 
-def calc_EddyVisc(RST, MeanFlow, S_ref=100):
+def calc_EddyVisc(RST, MeanGrad, S_ref=100):
     '''
     Purpose: Calculate eddy viscosity based on Boussinesq assumption using 
              Reynolds stress components and velocity gradients
@@ -187,7 +312,7 @@ def calc_EddyVisc(RST, MeanFlow, S_ref=100):
     Parameters
     ----------
     RST: ReynoldsStressTensor Class.
-    MeanFlow: MeanFlowField Class.
+    MeanGrad: MeanGradField Class.
     
     Return
     EddyVisc: 1D numpy array, float. Calculated dynamic eddy viscosity
@@ -203,17 +328,18 @@ def calc_EddyVisc(RST, MeanFlow, S_ref=100):
     uv = RST.Components[:,3]
     uw = RST.Components[:,4]
     vw = RST.Components[:,5]
-    dudx = MeanFlow.MeanGrad[:,0]
-    dudy = MeanFlow.MeanGrad[:,1]
-    dudz = MeanFlow.MeanGrad[:,2]
-    dvdx = MeanFlow.MeanGrad[:,3]
-    dvdy = MeanFlow.MeanGrad[:,4]
-    dvdz = MeanFlow.MeanGrad[:,5]
-    dwdx = MeanFlow.MeanGrad[:,6]
-    dwdy = MeanFlow.MeanGrad[:,7]
-    dwdz = MeanFlow.MeanGrad[:,8]
+    dudx = MeanGrad.VelGrad[:,0]
+    dudy = MeanGrad.VelGrad[:,1]
+    dudz = MeanGrad.VelGrad[:,2]
+    dvdx = MeanGrad.VelGrad[:,3]
+    dvdy = MeanGrad.VelGrad[:,4]
+    dvdz = MeanGrad.VelGrad[:,5]
+    dwdx = MeanGrad.VelGrad[:,6]
+    dwdy = MeanGrad.VelGrad[:,7]
+    dwdz = MeanGrad.VelGrad[:,8]
     flag = np.zeros(shape=(ng,1))
     
+    # calc eddy viscosity
     denominator = 2*(dudx**2+dvdy**2+dwdz**2+
                      2*(0.5*(dudy+dvdx))**2+
                      2*(0.5*(dudz+dwdx))**2+
@@ -245,12 +371,30 @@ def calc_EddyVisc(RST, MeanFlow, S_ref=100):
     return EddyVisc, flag
 
 
-def plot_Lumley_tri():
+def plot_Lumley_tri(method='w/o data', coors=None):
     '''
     Purpose: plot Lumley triangle template
+    
+    Parameters
+    ----------
+    method : string; w/o data (default) for plotting frame only; else for plotting data
+    coors  : 2D numpy array, float; coordinates calculated from ReynoldsStressTensor.LumleyTriCoor
+             nrow = ngrid (number of grid)
+             ncol = 2; Lumley triangle coordinates PC3 and PC2
+        
+    Returns
+    -------
+    fig    : matplotlib figure
     '''
 
     fig = plt.figure(figsize=(6,6))
+    
+    # plot data
+    if method != 'w/o data':
+        try:
+            plt.scatter(coors[:,0], coors[:,1], zorder=0)
+        except:
+            raise ValueError("User input 'coors' is not 2D numpy array")
     
     # figure format
     plt.xlabel('III')
@@ -275,13 +419,31 @@ def plot_Lumley_tri():
     
     return fig
 
-def plot_turb_tri():
+def plot_turb_tri(method='w/o data', coors=None):
     '''
-    Purpose: plot turbulence triangle template
+    Purpose: plot turbulence triangle
+    
+    Parameters
+    ----------
+    method : string; w/o data (default) for plotting frame only; else for plotting data
+    coors  : 2D numpy array, float; coordinates calculated from ReynoldsStressTensor.TurbTriCoor
+             nrow = ngrid (number of grid)
+             ncol = 2; turbulence triangle coordinates xi and eta
+        
+    Returns
+    -------
+    fig    : matplotlib figure
     '''
 
     fig = plt.figure(figsize=(6,6))
-    
+
+    # plot data
+    if method != 'w/o data':
+        try:
+            plt.scatter(coors[:,0], coors[:,1], zorder=0)
+        except:
+            raise ValueError("User input 'coors' is not 2D numpy array")
+            
     # figure format
     plt.xlabel(r'$\xi$')
     plt.ylabel(r'$\eta$')
@@ -305,12 +467,30 @@ def plot_turb_tri():
     
     return fig
 
-def plot_bary_tri():
+def plot_bary_tri(method='w/o data', coors=None):
     '''
-    Purpose: plot barycentric map template
+    Purpose: plot barycentric map
+
+    Parameters
+    ----------
+    method : string; w/o data (default) for plotting frame only; else for plotting data
+    coors  : 2D numpy array, float; coordinates calculated from ReynoldsStressTensor.BaryTriCoor
+             nrow = ngrid (number of grid)
+             ncol = 2; barycentric map coordinates xB and yB
+        
+    Returns
+    -------
+    fig    : matplotlib figure
     '''
 
     fig = plt.figure(figsize=(7,6))
+
+    # plot data
+    if method != 'w/o data':
+        try:
+            plt.scatter(coors[:,0], coors[:,1], zorder=0)
+        except:
+            raise ValueError("User input 'coors' is not 2D numpy array")
     
     # figure format
     plt.xlabel('$x_B$')
@@ -333,8 +513,16 @@ def plot_bary_tri():
 def plot_bary_tri_colormap(c_off=0.65,c_exp=5,nsample=60):
     '''
     Purpose: plot barycentric color map
-    ---
-    Recommended [c_off, c_exp] values: [0.65, 5]; [0.80, 5]
+
+    Parameters
+    ----------
+    [c_off, c_exp] : float; parameters define the colormap; recommended [0.65, 5] or [0.80, 5]
+    nsample        : number of scatter points uniformly distributed in the triangle; default 60
+        
+    Returns
+    -------
+    fig    : matplotlib figure
+
     '''
     
     fig = plt.figure(figsize=(3.5,3))

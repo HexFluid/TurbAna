@@ -53,7 +53,7 @@ start_sec1 = time.time()
 data_path = os.path.join(current_path, 'bstep_data')
 
 # option to save SPOD results
-save_fig  = False  # postprocess figs
+save_fig  = True  # postprocess figs
 save_path = data_path
 
 # load data from h5 format
@@ -69,21 +69,6 @@ DDES_MeanFlow = h5f['MeanFlow'][:] # Mean flow fields
 DDES_MeanGrad = h5f['MeanGrad'][:] # Velocity gradients
 DDES_Flag     = h5f['FlagDES'][:]  # DES flags (shielding function, delta/H, FKH)
 h5f.close()
-
-# fill in zero for uw and vw
-DNS_TurbStat = np.concatenate((DNS_TurbStat, np.zeros(shape=[DNS_TurbStat.shape[0], 2])), axis=1)
-DDES_TurbStat = np.concatenate((DDES_TurbStat, np.zeros(shape=[DDES_TurbStat.shape[0], 2])), axis=1)
-
-# fill in zero for w
-DDES_MeanFlow = np.concatenate((DDES_MeanFlow[:,0:4], 
-                               np.zeros(shape=[DDES_MeanFlow.shape[0], 1]),
-                               DDES_MeanFlow[:,4].reshape([-1,1])), axis=1)
-
-# fill in zero for dudz,dvdz,dwdx,dwdy,dwdz
-DDES_MeanGrad = np.concatenate((DDES_MeanGrad[:,0:2], 
-                               np.zeros(shape=[DDES_MeanGrad.shape[0], 1]),
-                               DDES_MeanGrad[:,2:4], 
-                               np.zeros(shape=[DDES_MeanGrad.shape[0], 4])), axis=1)
 
 # Sec. 1 end time
 end_sec1 = time.time()
@@ -297,9 +282,10 @@ print('--------------------------------------'    )
 start_sec4 = time.time()
 
 # main function
-DDES_Mean = TurbAna.MeanFlowField(DDES_MeanFlow, DDES_MeanGrad)
+DDES_Mean = TurbAna.MeanFlowField(DDES_MeanFlow)
+DDES_Grad = TurbAna.MeanGradField(DDES_MeanGrad)
 S_ref = 20
-[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Mean,S_ref=S_ref)
+[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Grad,S_ref=S_ref)
 
 # Sec. 4 end time
 end_sec4 = time.time()

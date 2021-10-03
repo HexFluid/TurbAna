@@ -62,19 +62,6 @@ DNS_MeanFlow = h5f['MeanFlow'][:] # Mean flow fields
 DNS_MeanGrad = h5f['MeanGrad'][:] # Velocity gradients
 h5f.close()
 
-# fill in zero for uw and vw
-DNS_TurbStat = np.concatenate((DNS_TurbStat, np.zeros(shape=[DNS_TurbStat.shape[0], 2])), axis=1)
-
-# fill in zero for w and mu_t
-DNS_MeanFlow = np.concatenate((DNS_MeanFlow[:,0:4], 
-                               np.zeros(shape=[DNS_MeanFlow.shape[0], 2])), axis=1)
-
-# fill in zero for dudz,dvdz,dwdx,dwdy,dwdz
-DNS_MeanGrad = np.concatenate((DNS_MeanGrad[:,0:2], 
-                               np.zeros(shape=[DNS_MeanGrad.shape[0], 1]),
-                               DNS_MeanGrad[:,2:4], 
-                               np.zeros(shape=[DNS_MeanGrad.shape[0], 4])), axis=1)
-
 # Sec. 1 end time
 end_sec1 = time.time()
 
@@ -164,8 +151,9 @@ sel_idx_DNS = (np.abs(DNS_Grid[:,0]-xloc)<eps)&(DNS_Grid[:,1]<=ymax)&(DNS_Grid[:
 fig31 = TurbAna.plot_Lumley_tri()
 
 # plot DNS data
-plt.scatter(DNS_RST.LumleyTriCoor[sel_idx_DNS,0], DNS_RST.LumleyTriCoor[sel_idx_DNS,1], label='DNS', 
-            marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
+DNS_coors = DNS_RST.LumleyTriCoor()
+plt.scatter(DNS_coors[sel_idx_DNS,0], DNS_coors[sel_idx_DNS,1], label='DNS', 
+            facecolor= 'white', edgecolors='red', linewidths = 1.0, zorder = 3)
 
 # figure format
 plt.legend(loc='upper left')
@@ -189,8 +177,9 @@ sel_idx_DNS = (np.abs(DNS_Grid[:,0]-xloc)<eps)&(DNS_Grid[:,1]<=ymax)&(DNS_Grid[:
 fig32 = TurbAna.plot_turb_tri()
 
 # plot DNS data
-plt.scatter(DNS_RST.TurbTriCoor[sel_idx_DNS,0], DNS_RST.TurbTriCoor[sel_idx_DNS,1], label='DNS', 
-            marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
+DNS_coors = DNS_RST.TurbTriCoor()
+plt.scatter(DNS_coors[sel_idx_DNS,0], DNS_coors[sel_idx_DNS,1], label='DNS', 
+            facecolor= 'white', edgecolors='red', linewidths = 1.0, zorder = 3)
 
 # figure format
 plt.legend(loc='lower right')
@@ -214,8 +203,9 @@ sel_idx_DNS = (np.abs(DNS_Grid[:,0]-xloc)<eps)&(DNS_Grid[:,1]<=ymax)&(DNS_Grid[:
 fig33 = TurbAna.plot_bary_tri()
 
 # plot DNS data
-plt.scatter(DNS_RST.BaryTriCoor[sel_idx_DNS,0], DNS_RST.BaryTriCoor[sel_idx_DNS,1], label='DNS', 
-            marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
+DNS_coors = DNS_RST.BaryTriCoor()
+plt.scatter(DNS_coors[sel_idx_DNS,0], DNS_coors[sel_idx_DNS,1], label='DNS', 
+            facecolor= 'white', edgecolors='red', linewidths = 1.0, zorder = 3)
 
 # figure format
 plt.legend(loc='lower center', columnspacing=0.7,ncol=2,bbox_to_anchor=(0.5, -0.15))
@@ -269,9 +259,10 @@ print('--------------------------------------'    )
 start_sec4 = time.time()
 
 # main function
-DNS_Mean = TurbAna.MeanFlowField(DNS_MeanFlow, DNS_MeanGrad)
+DNS_Mean = TurbAna.MeanFlowField(DNS_MeanFlow)
+DNS_Grad = TurbAna.MeanGradField(DNS_MeanGrad)
 S_ref = 10
-[DNS_EddyViscCal, DNS_EddyViscFlag] = TurbAna.calc_EddyVisc(DNS_RST,DNS_Mean,S_ref=S_ref)
+[DNS_EddyViscCal, DNS_EddyViscFlag] = TurbAna.calc_EddyVisc(DNS_RST,DNS_Grad,S_ref=S_ref)
 
 # Sec. 4 end time
 end_sec4 = time.time()

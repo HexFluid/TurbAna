@@ -61,19 +61,6 @@ DDES_MeanFlow = h5f['MeanFlow'][:] # Mean flow fields
 DDES_MeanGrad = h5f['MeanGrad'][:] # Velocity gradients
 h5f.close()
 
-# fill in zero for uw and vw
-DDES_TurbStat = np.concatenate((DDES_TurbStat, np.zeros(shape=[DDES_TurbStat.shape[0], 2])), axis=1)
-
-# fill in zero for w and mu_t
-DDES_MeanFlow = np.concatenate((DDES_MeanFlow[:,0:4], 
-                               np.zeros(shape=[DDES_MeanFlow.shape[0], 2])), axis=1)
-
-# fill in zero for dudz,dvdz,dwdx,dwdy,dwdz
-DDES_MeanGrad = np.concatenate((DDES_MeanGrad[:,0:2], 
-                               np.zeros(shape=[DDES_MeanGrad.shape[0], 1]),
-                               DDES_MeanGrad[:,2:4], 
-                               np.zeros(shape=[DDES_MeanGrad.shape[0], 4])), axis=1)
-
 # Sec. 1 end time
 end_sec1 = time.time()
 
@@ -162,7 +149,8 @@ sel_idx_DDES = (np.abs(DDES_Grid[:,1]-yloc)<eps)
 fig31 = TurbAna.plot_Lumley_tri()
 
 # plot DDES data
-plt.scatter(DDES_RST.LumleyTriCoor[sel_idx_DDES,0], DDES_RST.LumleyTriCoor[sel_idx_DDES,1], label='DDES', 
+DDES_coors = DDES_RST.LumleyTriCoor()
+plt.scatter(DDES_coors[sel_idx_DDES,0], DDES_coors[sel_idx_DDES,1], label='DDES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -185,7 +173,8 @@ sel_idx_DDES = (np.abs(DDES_Grid[:,1]-yloc)<eps)
 fig32 = TurbAna.plot_turb_tri()
 
 # plot DDES data
-plt.scatter(DDES_RST.TurbTriCoor[sel_idx_DDES,0], DDES_RST.TurbTriCoor[sel_idx_DDES,1], label='DDES', 
+DDES_coors = DDES_RST.TurbTriCoor()
+plt.scatter(DDES_coors[sel_idx_DDES,0], DDES_coors[sel_idx_DDES,1], label='DDES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -208,7 +197,8 @@ sel_idx_DDES = (np.abs(DDES_Grid[:,1]-yloc)<eps)
 fig33 = TurbAna.plot_bary_tri()
 
 # plot DDES data
-plt.scatter(DDES_RST.BaryTriCoor[sel_idx_DDES,0], DDES_RST.BaryTriCoor[sel_idx_DDES,1], label='DDES', 
+DDES_coors = DDES_RST.BaryTriCoor()
+plt.scatter(DDES_coors[sel_idx_DDES,0], DDES_coors[sel_idx_DDES,1], label='DDES', 
             marker='s', facecolor= 'white', edgecolors='orange', linewidths = 1.0, zorder = 3)
 
 # figure format
@@ -263,9 +253,10 @@ print('--------------------------------------'    )
 start_sec4 = time.time()
 
 # main function
-DDES_Mean = TurbAna.MeanFlowField(DDES_MeanFlow, DDES_MeanGrad)
+DDES_Mean = TurbAna.MeanFlowField(DDES_MeanFlow)
+DDES_Grad = TurbAna.MeanGradField(DDES_MeanGrad)
 S_ref = 100
-[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Mean,S_ref=S_ref)
+[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Grad,S_ref=S_ref)
 
 # Sec. 4 end time
 end_sec4 = time.time()
