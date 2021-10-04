@@ -1,5 +1,5 @@
 <p align="center">
-    <img alt="Illustration of SPOD workflow" src="docs/figs/logo.svg" width="400" />
+    <img alt="logo" src="docs/figs/logo.png" width="400" />
 </p>
 
 ---
@@ -12,7 +12,7 @@ This repository contains a Python toolkit that calculates and visualizes turbule
     <img alt="Illustration of TurbAna" src="docs/figs/TurbAna_schematic.png" width="500" />
 </p>
 
-If this script appears useful for your research, an explicit mention of the work [[5](#ddes-comp)] (for turbulence anisotropy) and [[6](#ddes-comp)] (for turbulent viscosity) would be highly appreciated.
+If this script appears useful for your research, an explicit mention of the work [[2](#ddes-bstep)] (for turbulence anisotropy) and [[3](#SA-ML)] (for turbulent viscosity) would be highly appreciated.
 
 ## Quick Start
 
@@ -84,7 +84,6 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 |   |   |-- results
 |   |   |-- bstep_DDES.h5
 |   |   |-- bstep_DNS.h5
-|   |   |-- bstep_SA_frozen.h5
 |   |-- bump_data
 |   |   |-- results
 |   |   |-- bump_LES.h5
@@ -110,26 +109,24 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 - **LICENSE**: license file
 - **tutorials**
   - **bstep_data**
-    - **results**: postprocess results of the single variable case
-    - **bstep_DDES.h5**: flow field and grid data (HDF5 format)
-    - **bstep_DNS.h5**: flow field and grid data (HDF5 format)
-    - **bstep_SA_frozen.h5**: flow field and grid data (HDF5 format)
-    - **bstep_SAQCR_frozen.h5**: flow field and grid data (HDF5 format)
-    - **bump_data**
-      - **results**: postprocess results of the single variable case
-      - **bump_LES.h5**: flow field and grid data (HDF5 format)
-      - **bump_SST.h5**: flow field and grid data (HDF5 format)
+    - **results**: postprocess results of the backstep case
+    - **bstep_DDES.h5**: DDES data (HDF5 format)
+    - **bstep_DNS.h5**: DNS data (HDF5 format)
+  - **bump_data**
+    - **results**: postprocess results of the bump case
+    - **bump_LES.h5**: LES data (HDF5 format)
+    - **bump_SST.h5**: RANS SST data (HDF5 format)
   - **cooling_data**
-    - **results**: postprocess results of the multiple variable case
-    - **cooling_DDES.h5**: flow field and grid data (HDF5 format)
+    - **results**: postprocess results of the cooling case
+    - **cooling_DDES.h5**: DDES data (HDF5 format)
   - **SBLI_data**
-    - **results**: postprocess results of the single variable case
-    - **SBLI_DNS.h5**: flow field and grid data (HDF5 format)
-    - **SBLI_SST.h5**: flow field and grid data (HDF5 format)
+    - **results**: postprocess results of the SBLI case
+    - **SBLI_DNS.h5**: DNS data (HDF5 format)
+    - **SBLI_SST.h5**: RANS SST data (HDF5 format)
   - **01_bstep.py**: tutorial script for the backward-facing step case
   - **02_bump.py**: tutorial script for the transonic bump case
   - **03_cooling.py**: tutorial script for the film cooling case
-  - **04_SBLI.py**: tutorial script for the shock boundary layer interaction (SBLI) case
+  - **04_SBLI.py**: tutorial script for the shock/boundary layer interaction (SBLI) case
 - **docs**
   - **figs**: figures appeared in the markdown files
   - **theory_guide.pdf**: theory of TurbAna
@@ -137,6 +134,6 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 ## References
 [<a id="anisotropy">1</a>] Emory, M., & Iaccarino, G. (2014). Visualizing turbulence anisotropy in the spatial domain with componentality contours. Center for Turbulence Research Annual Research Briefs, 123-138. [[link](https://web.stanford.edu/group/ctr/ResBriefs/2014/14_emory.pdf)]
 
-[<a id="ddes-comp">2</a>] He, X., Zhao, F., & Vahdati, M. (2022). Detached eddy simulation: recent development and application to compressor tip leakage flow. ASME Journal of Turbomachinery, 144(1), 011009. [[DOI](https://doi.org/10.1115/1.4052019)][[preprint](https://www.researchgate.net/publication/347355348_Detached_Eddy_Simulation_Recent_Development_and_Application_to_Compressor_Tip_Leakage_Flow)]
+[<a id="ddes-bstep">2</a>] He, X., Zhao, F., & Vahdati, M. (2022). Detached eddy simulation: recent development and application to compressor tip leakage flow. ASME Journal of Turbomachinery, 144(1), 011009. [[DOI](https://doi.org/10.1115/1.4052019)][[preprint](https://www.researchgate.net/publication/347355348_Detached_Eddy_Simulation_Recent_Development_and_Application_to_Compressor_Tip_Leakage_Flow)]
 
 [<a id="SA-ML">3</a>] He, X., Tan, J., & Vahdati, M. (2021). Towards Explainable Machine Learning Assisted Turbulence Modelling for Transonic Flows. [[preprint](https://www.researchgate.net/publication/344903748_Towards_Explainable_Machine_Learning_Assisted_Turbulence_Modelling_for_Transonic_Flows)]
