@@ -10,7 +10,7 @@ Reynolds stress components data. Details of the data can be found in the followi
   of Turbomachinery, 144(1), 011009.
 
 Xiao He (xiao.he2014@imperial.ac.uk)
-Last update: 30-Sep-2021
+Last update: 30-June-2022
 """
 
 # -------------------------------------------------------------------------
@@ -53,7 +53,7 @@ start_sec1 = time.time()
 data_path = os.path.join(current_path, 'bstep_data')
 
 # option to save SPOD results
-save_fig  = True  # postprocess figs
+save_fig  = False  # postprocess figs
 save_path = data_path
 
 # load data from h5 format
@@ -284,8 +284,9 @@ start_sec4 = time.time()
 # main function
 DDES_Mean = TurbAna.MeanFlowField(DDES_MeanFlow)
 DDES_Grad = TurbAna.MeanGradField(DDES_MeanGrad)
-S_ref = 20
-[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Grad,S_ref=S_ref)
+S_ref = 30
+method = 'QCR2013V' # recommend Boussinesq/QCR2013V
+[DDES_EddyViscCal, DDES_EddyViscFlag] = TurbAna.calc_EddyVisc(DDES_RST,DDES_Grad,S_ref=S_ref,method=method)
 
 # Sec. 4 end time
 end_sec4 = time.time()
@@ -309,11 +310,11 @@ start_sec5 = time.time()
 ### 5.1 plot eddy viscosity calculation flag
 fig51 = bstep_frame()
 cntr = plt.tricontourf(DDES_Grid[:,0], DDES_Grid[:,1], DDES_EddyViscFlag[:,0], 
-                       np.linspace(-1,1,11),cmap=cm.coolwarm,extend='both', zorder=0)
+                       np.linspace(-0.5,3.5,5),cmap=cm.rainbow,extend='both', zorder=0)
 
 # colorbar
-plt.colorbar(cntr,ticks=np.linspace(-1,1,3),shrink=0.8,extendfrac='auto',\
-             orientation='vertical', label='limiter')
+plt.colorbar(cntr,ticks=np.linspace(0,3,4),shrink=0.8,extendfrac='auto',\
+             orientation='vertical', label=r'$f_{lim}$')
 
 if save_fig:
     plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_limiter.png'), 
@@ -333,7 +334,7 @@ cbar = plt.colorbar(cntr,ticks=np.linspace(0,3,4),shrink=0.8,extendfrac='auto',\
 cbar.ax.set_yticklabels(['$10^0$', '$10^1$', '$10^2$', '$10^3$'])
 
 if save_fig:
-    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_'+method+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
     plt.close()
 
 # -------------------------------------------------------------------------  

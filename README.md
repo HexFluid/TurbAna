@@ -6,7 +6,7 @@
 
 # Turbulence Analyzer in Python
 
-This repository contains a Python toolkit that calculates and visualizes turbulence anisotropy and turbulent viscosity from Reynolds stress components. A more detailed explanation can be found in the [theory guide](./docs/theory_guide.pdf). A graphical abstract of this package is illustrated in the following figure.
+This repository contains a Python toolkit that calculates and visualizes turbulence anisotropy and turbulent viscosity from Reynolds stress components. A graphical abstract of this package is illustrated in the following figure.
 
 <p align="center">
     <img alt="Illustration of TurbAna" src="docs/figs/TurbAna_schematic.png" width="500" />
@@ -115,14 +115,12 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
   - **bump_data**
     - **results**: postprocess results of the bump case
     - **bump_LES.h5**: LES data (HDF5 format)
-    - **bump_SST.h5**: RANS SST data (HDF5 format)
   - **cooling_data**
     - **results**: postprocess results of the cooling case
     - **cooling_DDES.h5**: DDES data (HDF5 format)
   - **SBLI_data**
     - **results**: postprocess results of the SBLI case
     - **SBLI_DNS.h5**: DNS data (HDF5 format)
-    - **SBLI_SST.h5**: RANS SST data (HDF5 format)
   - **01_bstep.py**: tutorial script for the backward-facing step case
   - **02_bump.py**: tutorial script for the transonic bump case
   - **03_cooling.py**: tutorial script for the film cooling case
@@ -136,4 +134,4 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 
 [<a id="ddes-bstep">2</a>] He, X., Zhao, F., & Vahdati, M. (2022). Detached eddy simulation: recent development and application to compressor tip leakage flow. ASME Journal of Turbomachinery, 144(1), 011009. [[DOI](https://doi.org/10.1115/1.4052019)][[preprint](https://www.researchgate.net/publication/347355348_Detached_Eddy_Simulation_Recent_Development_and_Application_to_Compressor_Tip_Leakage_Flow)]
 
-[<a id="SA-ML">3</a>] He, X., Tan, J., & Vahdati, M. (2021). Towards Explainable Machine Learning Assisted Turbulence Modelling for Transonic Flows. [[preprint](https://www.researchgate.net/publication/344903748_Towards_Explainable_Machine_Learning_Assisted_Turbulence_Modelling_for_Transonic_Flows)]
+[<a id="SA-ML">3</a>] He, X., Tan, J., & Vahdati, M. (2022). On the Explainability of Machine-Learning-Assisted Turbulence Modeling for Transonic Flows. International Journal of Heat and Fluid Flow. (under review) [[preprint](https://www.researchgate.net/publication/344903748_On_the_Explainability_of_Machine-Learning-Assisted_Turbulence_Modeling_for_Transonic_Flows)]

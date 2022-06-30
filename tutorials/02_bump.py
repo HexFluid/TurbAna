@@ -6,7 +6,7 @@ Reynolds stress components data. Details of the data can be found in the followi
   transonic shock-induced flow separation. AIAA Journal, 57(5), 1955-1972.
 
 Xiao He (xiao.he2014@imperial.ac.uk)
-Last update: 30-Sep-2021
+Last update: 30-June-2022
 """
 
 # -------------------------------------------------------------------------
@@ -49,7 +49,7 @@ start_sec1 = time.time()
 data_path = os.path.join(current_path, 'bump_data')
 
 # option to save SPOD results
-save_fig  = True  # postprocess figs
+save_fig  = False  # postprocess figs
 save_path = data_path
 
 # load data from h5 format
@@ -116,6 +116,7 @@ def figure_format(xtitle, ytitle, zoom, legend):
     plt.xlabel(xtitle)
     plt.ylabel(ytitle)
     plt.axis(zoom)
+    plt.axis('off')
     if legend != 'None':
         plt.legend(loc=legend)
 
@@ -124,7 +125,8 @@ def bump_frame():
     Purpose: template for backward-facing step 2D contour plot
     '''
 
-    fig = plt.figure(figsize=(6,4))
+    # fig = plt.figure(figsize=(6,4))
+    fig = plt.figure(figsize=(4,2.7))
 
     # wall boundary
     c=1
@@ -255,7 +257,7 @@ print( save_path                                  )
 print('Time lapsed: %.2f s'%(end_sec3-start_sec3) )
 print('--------------------------------------'    )
 
-
+#%%
 # -------------------------------------------------------------------------
 # 4. Calculate turbulent viscosity
 # function TurbAna.calc_EddyVisc(ReynoldsStressTensor, MeanFlowField)
@@ -267,8 +269,10 @@ start_sec4 = time.time()
 # main function
 LES_Mean = TurbAna.MeanFlowField(LES_MeanFlow)
 LES_Grad = TurbAna.MeanGradField(LES_MeanGrad)
-S_ref = 300
-[LES_EddyViscCal, LES_EddyViscFlag] = TurbAna.calc_EddyVisc(LES_RST,LES_Grad,S_ref=S_ref)
+
+S_ref  = 1000
+method = 'QCR2013V' # recommend Boussinesq/QCR2013V
+[LES_EddyViscCal, LES_EddyViscFlag] = TurbAna.calc_EddyVisc(LES_RST,LES_Grad,S_ref=S_ref,method=method)
 
 # Sec. 4 end time
 end_sec4 = time.time()
@@ -292,14 +296,14 @@ start_sec5 = time.time()
 ### 5.1 plot eddy viscosity calculation flag
 fig51 = bump_frame()
 cntr = plt.tricontourf(LES_Grid[:,0], LES_Grid[:,1], LES_EddyViscFlag[:,0], 
-                       np.linspace(-1,1,11),cmap=cm.coolwarm,extend='both', zorder=0)
+                       np.linspace(-0.5,3.5,5),cmap=cm.rainbow,extend='both', zorder=0)
 
 # colorbar
-plt.colorbar(cntr,ticks=np.linspace(-1,1,3),shrink=0.8,extendfrac='auto',\
-             orientation='vertical', label='limiter')
+plt.colorbar(cntr,ticks=np.linspace(0,3,4),shrink=0.8,extendfrac='auto',\
+             orientation='vertical', label=r'$f_{lim}$')
 
 if save_fig:
-    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_limiter.png'), 
+    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_'+method+'_ViscRatio_limiter.png'), 
                 dpi=300, bbox_inches='tight')
     plt.close()
 
@@ -316,7 +320,7 @@ cbar = plt.colorbar(cntr,ticks=np.linspace(0,4,3),shrink=0.8,extendfrac='auto',\
 cbar.ax.set_yticklabels(['$10^0$', '$10^2$', '$10^4$'])
 
 if save_fig:
-    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_'+method+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
     plt.close()
 
 # -------------------------------------------------------------------------  

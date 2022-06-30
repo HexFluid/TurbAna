@@ -8,7 +8,7 @@ found in the following:
   1307-1312.
 
 Xiao He (xiao.he2014@imperial.ac.uk)
-Last update: 30-Sep-2021
+Last update: 30-June-2022
 """
 
 # -------------------------------------------------------------------------
@@ -51,7 +51,7 @@ start_sec1 = time.time()
 data_path = os.path.join(current_path, 'SBLI_data')
 
 # option to save SPOD results
-save_fig  = True  # postprocess figs
+save_fig  = False  # postprocess figs
 save_path = data_path
 
 # load data from h5 format
@@ -261,8 +261,8 @@ start_sec4 = time.time()
 # main function
 DNS_Mean = TurbAna.MeanFlowField(DNS_MeanFlow)
 DNS_Grad = TurbAna.MeanGradField(DNS_MeanGrad)
-S_ref = 10
-[DNS_EddyViscCal, DNS_EddyViscFlag] = TurbAna.calc_EddyVisc(DNS_RST,DNS_Grad,S_ref=S_ref)
+S_ref = 100
+[DNS_EddyViscCal, DNS_EddyViscFlag] = TurbAna.calc_EddyVisc(DNS_RST,DNS_Grad,S_ref=S_ref,method='QCR2013V')
 
 # Sec. 4 end time
 end_sec4 = time.time()
@@ -286,11 +286,11 @@ start_sec5 = time.time()
 ### 5.1 plot eddy viscosity calculation flag
 fig51 = SBLI_frame()
 cntr = plt.tricontourf(DNS_Grid[:,0], DNS_Grid[:,1], DNS_EddyViscFlag[:,0], 
-                       np.linspace(-1,1,11),cmap=cm.coolwarm,extend='both', zorder=0)
+                       np.linspace(-0.5,3.5,5),cmap=cm.rainbow,extend='both', zorder=0)
 
 # colorbar
-plt.colorbar(cntr,ticks=np.linspace(-1,1,3),shrink=0.8,extendfrac='auto',\
-             orientation='vertical', label='limiter')
+plt.colorbar(cntr,ticks=np.linspace(0,3,4),shrink=0.8,extendfrac='auto',\
+             orientation='vertical', label=r'$f_{lim}$')
 
 if save_fig:
     plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_limiter.png'), 
@@ -310,7 +310,7 @@ cbar = plt.colorbar(cntr,ticks=np.linspace(0,3,4),shrink=0.8,extendfrac='auto',\
 cbar.ax.set_yticklabels(['$10^0$', '$10^1$', '$10^2$', '$10^3$'])
 
 if save_fig:
-    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_'+method+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
     plt.close()
 
 # -------------------------------------------------------------------------  

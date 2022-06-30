@@ -2,17 +2,21 @@
 Turbulence Analyzer (TurbAna) Python toolkit Ver 1.0
 
 The script was originally written for analyzing the turbulence anisotropy of 
-compressor tip leakage flows:
+compressor tip leakage flows [1] and the eddy viscosity field of transonic 
+bump flows [2]:
     
-  He, X., Zhao, F., & Vahdati, M. (2022). Detached Eddy Simulation: Recent
-  Development and Application to Compressor Tip Leakage Flow. ASME Journal
-  of Turbomachinery, 144(1), 011009.
+[1] He, X., Zhao, F., & Vahdati, M. (2022). Detached Eddy Simulation: Recent
+    Development and Application to Compressor Tip Leakage Flow. ASME Journal
+    of Turbomachinery, 144(1), 011009.
+[2] He, X., Tan, J., Rigas, G., and Vahdati, M. (2022). On the Explainability 
+    of Machine-Learning-Assisted Turbulence Modeling for Transonic Flows.
+    International Journal of Heat and Fluid Flow. 
   
-An explict reference to the work above is highly appreciated if this script is
+An explict reference to the works above is highly appreciated if this script is
 useful for your research.  
 
 Xiao He (xiao.he2014@imperial.ac.uk)
-Last update: 30-Sep-2021
+Last update: 08-June-2022
 """
 
 # -------------------------------------------------------------------------
@@ -304,7 +308,7 @@ def cubic_root(data):
     root=root.reshape(data_shape)
     return root
 
-def calc_EddyVisc(RST, MeanGrad, S_ref=100):
+def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     '''
     Purpose: Calculate eddy viscosity based on Boussinesq assumption using 
              Reynolds stress components and velocity gradients
@@ -313,6 +317,8 @@ def calc_EddyVisc(RST, MeanGrad, S_ref=100):
     ----------
     RST: ReynoldsStressTensor Class.
     MeanGrad: MeanGradField Class.
+    S_ref: real; limiter to avoid division by zero
+    Method: string; 'Boussinesq', 'QCR2000', 'QCR2013', 'QCR2013V'(default)
     
     Return
     EddyVisc: 1D numpy array, float. Calculated dynamic eddy viscosity
@@ -340,36 +346,225 @@ def calc_EddyVisc(RST, MeanGrad, S_ref=100):
     flag = np.zeros(shape=(ng,1))
     
     # calc eddy viscosity
-    denominator = 2*(dudx**2+dvdy**2+dwdz**2+
-                     2*(0.5*(dudy+dvdx))**2+
-                     2*(0.5*(dudz+dwdx))**2+
-                     2*(0.5*(dvdz+dwdy))**2-
-                     1/3*(dudx+dvdy+dwdz)**2)
-    numerator = -(uu*dudx+vv*dvdy+ww*dwdz+
-                  2*uv*0.5*(dudy+dvdx)+
-                  2*uw*0.5*(dudz+dwdx)+
-                  2*vw*0.5*(dvdz+dwdy)-
-                  1/3*(uu+vv+ww)*(dudx+dvdy+dwdz))
+    if method=='Boussinesq':
+        # default
+        denominator = 2*(dudx**2+dvdy**2+dwdz**2+
+                          2*(0.5*(dudy+dvdx))**2+
+                          2*(0.5*(dudz+dwdx))**2+
+                          2*(0.5*(dvdz+dwdy))**2-
+                          1/3*(dudx+dvdy+dwdz)**2)
+        numerator = -(uu*dudx+vv*dvdy+ww*dwdz+
+                      2*uv*0.5*(dudy+dvdx)+
+                      2*uw*0.5*(dudz+dwdx)+
+                      2*vw*0.5*(dvdz+dwdy)-
+                      1/3*(uu+vv+ww)*(dudx+dvdy+dwdz))
+
+        # # the following ignores the uu, vv, ww accuracy, because one-equation model does not have k 
+        # # and thus cannot predict uu, vv, ww; the absolute value of the Reynolds normal stress does
+        # # not matter much anyway, it is the dtau_ii/dx_j that matters.
+        # denominator = 2*(2*(0.5*(dudy+dvdx))**2+
+        #                  2*(0.5*(dudz+dwdx))**2+
+        #                  2*(0.5*(dvdz+dwdy))**2)
+        # numerator = -(2*uv*0.5*(dudy+dvdx)+
+        #               2*uw*0.5*(dudz+dwdx)+
+        #               2*vw*0.5*(dvdz+dwdy))
+        
+    elif method in ['QCR2000','QCR2013','QCR2013V']:
+        ccr1 = 0.3
+        ccr2 = 2.5
+        ugrad_mag = np.sqrt(dudx**2+dudy**2+dudz**2+
+                            dvdx**2+dvdy**2+dvdz**2+
+                            dwdx**2+dwdy**2+dwdz**2)
+        
+        # strain rate star
+        S_trace = dudx+dvdy+dwdz
+        S11 = dudx-S_trace/3
+        S22 = dvdy-S_trace/3
+        S33 = dwdz-S_trace/3
+        S12 = 0.5*(dudy+dvdx)
+        S13 = 0.5*(dudz+dwdx)
+        S23 = 0.5*(dvdz+dwdy)
+        S21 = S12
+        S31 = S13
+        S32 = S23
+        
+        # antisymmetric normalized rotation tensor
+        O11 = 0
+        O22 = 0
+        O33 = 0
+        O12 = (dudy-dvdx)/(ugrad_mag+1e-12)
+        O13 = (dudz-dwdx)/(ugrad_mag+1e-12)
+        O23 = (dvdz-dwdy)/(ugrad_mag+1e-12)
+        O21 = -O12
+        O31 = -O13
+        O32 = -O23
+
+        if method=='QCR2000': # deprecated for 1-eqn model; for 2-eqn models replace k by the values predicted by the model
+            # the following uses k (default)
+            k = 0 # assume k=0 for SA models
+            denominator = 2*((S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))**2+\
+                              (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))**2+\
+                              (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))**2+\
+                              (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))**2+\
+                              (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23))**2+\
+                              (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))**2+\
+                              (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))**2+\
+                              (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))**2+\
+                              (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33))**2)
+            
+            numerator = (S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))*(-uu+k*2/3)+\
+                        (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))*(-uv)+\
+                        (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))*(-uw)+\
+                        (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))*(-uv)+\
+                        (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23))*(-vv+k*2/3)+\
+                        (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))*(-vw)+\
+                        (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))*(-uw)+\
+                        (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))*(-vw)+\
+                        (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33))*(-ww+k*2/3)
+            
+            # # the following uses hi-fi TKE instead of k predicted by RANS
+            # denominator = 2*((S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))**2+\
+            #                   (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))**2+\
+            #                   (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))**2+\
+            #                   (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))**2+\
+            #                   (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23))**2+\
+            #                   (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))**2+\
+            #                   (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))**2+\
+            #                   (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))**2+\
+            #                   (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33))**2)
+            
+            # numerator = (S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))*(-uu+(uu+vv+ww)/3)+\
+            #             (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))*(-uv)+\
+            #             (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))*(-uw)+\
+            #             (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))*(-uv)+\
+            #             (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23))*(-vv+(uu+vv+ww)/3)+\
+            #             (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))*(-vw)+\
+            #             (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))*(-uw)+\
+            #             (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))*(-vw)+\
+            #             (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33))*(-ww+(uu+vv+ww)/3)
+    
+            # # the following ignores the uu, vv, ww accuracy, because one-equation model does not have k 
+            # # and thus cannot predict uu, vv, ww; the absolute value of the Reynolds normal stress does
+            # # not matter much anyway, it is the dtau_ii/dx_j that matters.
+            # denominator = 2*((S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))**2+\
+            #                   (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))**2+\
+            #                   (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))**2+\
+            #                   (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))**2+\
+            #                   (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))**2+\
+            #                   (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))**2)
+            
+            # numerator = (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))*(-uv)+\
+            #             (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))*(-uw)+\
+            #             (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))*(-uv)+\
+            #             (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))*(-vw)+\
+            #             (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))*(-uw)+\
+            #             (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))*(-vw)
+                        
+        if method=='QCR2013': # deprecated for 2-eqn model; for 1-eqn model prefer to use 2013V
+            pseudo_k = np.sqrt(2*(S11**2+S12**2+S13**2+S21**2+S22**2+S23**2+S31**2+S32**2+S33**2))
+            
+            denominator = 2*((S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))**2+\
+                        (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))**2+\
+                        (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))**2+\
+                        (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))**2+\
+                        (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23)-ccr2/2*pseudo_k)**2+\
+                        (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))**2+\
+                        (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))**2+\
+                        (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))**2+\
+                        (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33)-ccr2/2*pseudo_k)**2)
+            
+            numerator = (S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13)-ccr2/2*pseudo_k)*(-uu)+\
+                        (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))*(-uv)+\
+                        (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))*(-uw)+\
+                        (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))*(-uv)+\
+                        (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23)-ccr2/2*pseudo_k)*(-vv)+\
+                        (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))*(-vw)+\
+                        (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))*(-uw)+\
+                        (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))*(-vw)+\
+                        (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33)-ccr2/2*pseudo_k)*(-ww)
+
+        if method=='QCR2013V': # deprecated for 2-eqn model
+            pseudo_k = np.sqrt(2*(O11**2+O12**2+O13**2+O21**2+O22**2+O23**2+O31**2+O32**2+O33**2))*ugrad_mag/2
+            
+            denominator = 2*((S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13))**2+\
+                        (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))**2+\
+                        (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))**2+\
+                        (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))**2+\
+                        (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23)-ccr2/2*pseudo_k)**2+\
+                        (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))**2+\
+                        (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))**2+\
+                        (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))**2+\
+                        (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33)-ccr2/2*pseudo_k)**2)
+            
+            numerator = (S11-ccr1*(O11*S11+O11*S11+O12*S12+O12*S12+O13*S13+O13*S13)-ccr2/2*pseudo_k)*(-uu)+\
+                        (S12-ccr1*(O11*S21+O21*S11+O12*S22+O22*S12+O13*S23+O23*S13))*(-uv)+\
+                        (S13-ccr1*(O11*S31+O31*S11+O12*S32+O32*S12+O13*S33+O33*S13))*(-uw)+\
+                        (S21-ccr1*(O21*S11+O11*S21+O22*S12+O12*S22+O23*S13+O13*S23))*(-uv)+\
+                        (S22-ccr1*(O21*S21+O21*S21+O22*S22+O22*S22+O23*S23+O23*S23)-ccr2/2*pseudo_k)*(-vv)+\
+                        (S23-ccr1*(O21*S31+O31*S21+O22*S32+O32*S22+O23*S33+O33*S23))*(-vw)+\
+                        (S31-ccr1*(O31*S11+O11*S31+O32*S12+O12*S32+O33*S13+O13*S33))*(-uw)+\
+                        (S32-ccr1*(O31*S21+O21*S31+O32*S22+O22*S32+O33*S23+O23*S33))*(-vw)+\
+                        (S33-ccr1*(O31*S31+O31*S31+O32*S32+O32*S32+O33*S33+O33*S33)-ccr2/2*pseudo_k)*(-ww)
+                        
+    else:
+        raise ValueError("User input 'method' is not supported")
     
     # limit |denominator|>= S_ref**2
     S_ref2 = S_ref**2
-    idx_sref_neg = (denominator>=-S_ref2)&(denominator<= 0)
-    idx_sref_pos = (denominator<= S_ref2)&(denominator>= 0)
+    idx_sref_neg = np.where((denominator>=-S_ref2)&(denominator<= 0))
+    idx_sref_pos = np.where((denominator<= S_ref2)&(denominator>= 0))
+    idx_sref     = np.concatenate((idx_sref_neg[0].flatten(),idx_sref_pos[0].flatten()))
+    
+    if idx_sref != []:
+        flag[idx_sref,0]=1
+        # flag[idx_sref,0]=1-np.abs(denominator[idx_sref])/S_ref2
+    
     denominator[idx_sref_neg]=-S_ref2
     denominator[idx_sref_pos]= S_ref2
-    flag[idx_sref_neg]=1
-    flag[idx_sref_pos]=1    
 
     # calc eddy viscosity    
     EddyVisc = numerator/denominator
     
     # limit EddyVisc >= 0
-    idx_negEddyVisc = (EddyVisc<0)
+    idx_negEddyVisc = np.where(EddyVisc<0)[0]
     EddyVisc[idx_negEddyVisc] = 0
-    flag[idx_negEddyVisc] = -1
+    
+    if idx_negEddyVisc != []:
+        for idx in idx_negEddyVisc:
+            if flag[idx,0] == 0:
+                flag[idx,0] = 2
+            elif flag[idx,0] == 1:
+                flag[idx,0] = 3
     
     return EddyVisc, flag
 
+def calc_Nutilda(nu_t,nu_l):
+    '''
+    Purpose: Calculate nu_tilda, the variable of the SA transport equation, from
+             eddy viscosity nu_t and laminar viscosity nu_l
+    
+    Parameters
+    ----------
+    nu_t: 1D numpy array, float.
+    nu_l: 1D numpy array, float.
+    
+    Return
+    nu_tilda: 1D numpy array, float.
+    '''
+    from scipy.optimize import fsolve
+
+    def func(nu_tilda):
+        xx = nu_tilda/nu_li
+        f = xx**4/(xx**3+7.1**3) - nu_ti/nu_li
+        return f
+    
+    nu_tilda = []
+    for i in range(nu_t.shape[0]):
+        nu_ti = nu_t[i]
+        nu_li = nu_l[i]
+        nu_tilda.append(fsolve(func, nu_ti))
+    
+    return(np.array(nu_tilda)[:,0])
 
 def plot_Lumley_tri(method='w/o data', coors=None):
     '''
@@ -516,7 +711,7 @@ def plot_bary_tri_colormap(c_off=0.65,c_exp=5,nsample=60):
 
     Parameters
     ----------
-    [c_off, c_exp] : float; parameters define the colormap; recommended [0.65, 5] or [0.80, 5]
+    [c_off, c_exp] : float; parameters define the colormap; recommended [0.65, 5] or [0.80, 5] or [-1.50, 6]
     nsample        : number of scatter points uniformly distributed in the triangle; default 60
         
     Returns
