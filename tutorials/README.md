@@ -2,9 +2,9 @@
 
 We present four case studies in fluid mechanics using *TurbAna*:
 - 2D backward-facing step [[1](#dns-bstep),[2](#ddes-bstep)]: **01_bstep.py**
-- 2D transonic bump [[1](#les-bump),[2](#rans-bump)]: **02_bump.py**
-- 2D turbine film cooling [[3](#ddes-cool)]: **03_cooling.py**
-- 2D shock/boundary layer interaction [[4](#dns-sbli)]: **04_SBLI.py**
+- 2D transonic bump [[3](#les-bump)]: **02_bump.py**
+- 2D turbine film cooling [[4](#ddes-cool)]: **03_cooling.py**
+- 2D shock/boundary layer interaction [[5](#dns-sbli)]: **04_SBLI.py**
 
 This page briefly introduces the flow physics of each case and the major results of *TurbAna*. The tutorial scripts are well-commented, self-explanatory, and easily transferrable to other cases. If you are using any data from the tutorial cases, please explicitly mention the corresponding publications.
 

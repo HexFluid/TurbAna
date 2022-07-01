@@ -78,7 +78,6 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 .
 |-- docs
 |   |-- figs
-|   |-- theory_guide.pdf
 |-- tutorials
 |   |-- bstep_data
 |   |   |-- results
@@ -87,14 +86,12 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
 |   |-- bump_data
 |   |   |-- results
 |   |   |-- bump_LES.h5
-|   |   |-- bump_SST.h5
 |   |-- cooling_data
 |   |   |-- results
 |   |   |-- cooling_DDES.h5
 |   |-- SBLI_data
 |   |   |-- results
 |   |   |-- SBLI_DNS.h5
-|   |   |-- SBLI_SST.h5
 |   |-- 01_bstep.py
 |   |-- 02_bump.py
 |   |-- 03_cooling.py
@@ -127,11 +124,10 @@ For more postprocess tutorials including plotting turbulence anisotropy contours
   - **04_SBLI.py**: tutorial script for the shock/boundary layer interaction (SBLI) case
 - **docs**
   - **figs**: figures appeared in the markdown files
-  - **theory_guide.pdf**: theory of TurbAna
 
 ## References
 [<a id="anisotropy">1</a>] Emory, M., & Iaccarino, G. (2014). Visualizing turbulence anisotropy in the spatial domain with componentality contours. Center for Turbulence Research Annual Research Briefs, 123-138. [[link](https://web.stanford.edu/group/ctr/ResBriefs/2014/14_emory.pdf)]
 
 [<a id="ddes-bstep">2</a>] He, X., Zhao, F., & Vahdati, M. (2022). Detached eddy simulation: recent development and application to compressor tip leakage flow. ASME Journal of Turbomachinery, 144(1), 011009. [[DOI](https://doi.org/10.1115/1.4052019)][[preprint](https://www.researchgate.net/publication/347355348_Detached_Eddy_Simulation_Recent_Development_and_Application_to_Compressor_Tip_Leakage_Flow)]
 
-[<a id="SA-ML">3</a>] He, X., Tan, J., & Vahdati, M. (2022). On the Explainability of Machine-Learning-Assisted Turbulence Modeling for Transonic Flows. International Journal of Heat and Fluid Flow. (under review) [[preprint](https://www.researchgate.net/publication/344903748_On_the_Explainability_of_Machine-Learning-Assisted_Turbulence_Modeling_for_Transonic_Flows)]
+[<a id="SA-ML">3</a>] He, X., Tan, J., Rigas, G., & Vahdati, M. (2022). On the Explainability of Machine-Learning-Assisted Turbulence Modeling for Transonic Flows. International Journal of Heat and Fluid Flow. (under review) [[preprint](https://www.researchgate.net/publication/344903748_On_the_Explainability_of_Machine-Learning-Assisted_Turbulence_Modeling_for_Transonic_Flows)]
