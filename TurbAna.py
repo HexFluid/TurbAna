@@ -10,13 +10,13 @@ bump flows [2]:
     of Turbomachinery, 144(1), 011009.
 [2] He, X., Tan, J., Rigas, G., and Vahdati, M. (2022). On the Explainability 
     of Machine-Learning-Assisted Turbulence Modeling for Transonic Flows.
-    International Journal of Heat and Fluid Flow. 
+    International Journal of Heat and Fluid Flow, 97, 109038. 
   
 An explict reference to the works above is highly appreciated if this script is
 useful for your research.  
 
 Xiao He (xiao.he2014@imperial.ac.uk)
-Last update: 08-June-2022
+Last update: 20-August-2022
 """
 
 # -------------------------------------------------------------------------
@@ -307,6 +307,101 @@ def cubic_root(data):
     root=np.array(root)    
     root=root.reshape(data_shape)
     return root
+
+def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
+    '''
+    Purpose: Calculate Reynolds stress tensor based on a constitutive relation
+             using velocity gradients, eddy viscosity and TKE
+    
+    Parameters
+    ----------
+    MeanGrad : MeanGradField Class.
+    EddyVisc : 1D numpy array, float. Dynamic eddy viscosity
+    TKE      : 1D numpy array, float. Turbulence kinetic energy (default 0)
+    Method   : string; 'Boussinesq'(default), 'QCR2000', 'QCR2013', 'QCR2013V'
+    
+    Return
+    
+    RST: ReynoldsStressTensor Class.
+    '''
+    
+    # initialize parameters
+    ng = EddyVisc.shape[0]
+    RST = np.zeros(shape=[ng,6])
+
+    S_trace = MeanGrad.StrainRate[:,0]+MeanGrad.StrainRate[:,1]+MeanGrad.StrainRate[:,2]
+    S11 = MeanGrad.StrainRate[:,0]-S_trace/3
+    S22 = MeanGrad.StrainRate[:,1]-S_trace/3
+    S33 = MeanGrad.StrainRate[:,2]-S_trace/3
+    S12 = MeanGrad.StrainRate[:,3]
+    S13 = MeanGrad.StrainRate[:,4]
+    S23 = MeanGrad.StrainRate[:,5]
+    S21 = S12
+    S31 = S13
+    S32 = S23
+    
+    # Linear Boussinesq part of Reynolds stress    
+    RST[:,0] = -2*EddyVisc*S11
+    RST[:,1] = -2*EddyVisc*S22
+    RST[:,2] = -2*EddyVisc*S33
+    RST[:,3] = -2*EddyVisc*S12
+    RST[:,4] = -2*EddyVisc*S13
+    RST[:,5] = -2*EddyVisc*S23
+    
+    # Quadratic terms
+    if method in ['QCR2000','QCR2013','QCR2013V']:
+        ccr1 = 0.3
+
+        # antisymmetric normalized rotation tensor
+        ugrad_mag = np.sqrt(np.sum((MeanGrad.VelGrad)**2, axis=1))
+        O11 = 0
+        O22 = 0
+        O33 = 0
+        O12 = 2*MeanGrad.Vorticity[:,0]/(ugrad_mag+1e-12)
+        O13 = 2*MeanGrad.Vorticity[:,1]/(ugrad_mag+1e-12)
+        O23 = 2*MeanGrad.Vorticity[:,2]/(ugrad_mag+1e-12)
+        O21 = -O12
+        O31 = -O13
+        O32 = -O23
+        
+        # add quadratic terms
+        delta_RST = np.zeros(shape=[ng,6])
+        delta_RST[:,0] = -ccr1*(2*O12*RST[:,3]+2*O13*RST[:,4])
+        delta_RST[:,1] = -ccr1*(2*O21*RST[:,3]+2*O23*RST[:,5])
+        delta_RST[:,2] = -ccr1*(2*O31*RST[:,4]+2*O32*RST[:,5])
+        delta_RST[:,3] = -ccr1*(O12*RST[:,1]+O13*RST[:,5]+\
+                          O21*RST[:,0]+O23*RST[:,4])
+        delta_RST[:,4] = -ccr1*(O12*RST[:,5]+O13*RST[:,2]+\
+                          O31*RST[:,0]+O32*RST[:,3])
+        delta_RST[:,5] = -ccr1*(O21*RST[:,4]+O23*RST[:,2]+\
+                          O31*RST[:,3]+O32*RST[:,1])
+        RST = RST+delta_RST
+            
+    # TKE diagonal term
+    if (method == 'QCR2013') and (np.sum(np.abs(TKE)) < 1e-9):
+        # mimic the TKE term using QCR2013
+        ccr2 = 2.5
+        S_mag = np.sqrt(S11**2+S12**2+S13**2+
+                        S21**2+S22**2+S23**2+
+                        S31**2+S32**2+S33**2)*np.sqrt(2)
+        RST[:,0] += ccr2*EddyVisc*S_mag
+
+    elif (method == 'QCR2013V') and (np.sum(np.abs(TKE)) < 1e-9):
+        # mimic the TKE term using QCR2013V
+        ccr2 = 2.5
+        W_mag = np.sqrt(O11**2+O12**2+O13**2+
+                        O21**2+O22**2+O23**2+
+                        O31**2+O32**2+O33**2)* \
+                (ugrad_mag+1e-12)/np.sqrt(2)
+        RST[:,0] += ccr2*EddyVisc*W_mag
+        
+    else:
+        # use user-input TKE term
+        RST[:,0] += 2/3*TKE
+        RST[:,1] += 2/3*TKE
+        RST[:,2] += 2/3*TKE
+    
+    return RST
 
 def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     '''
