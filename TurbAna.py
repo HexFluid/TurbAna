@@ -108,7 +108,7 @@ class MeanGradField:
             self.ngrid = ngrid
             self.nvar  = nvar
             
-            if nvar == 4: # 2D data with uu,vv,ww,uv
+            if nvar == 4: # 2D data with dudx, dudy, dvdx, dvdy
                 print('Initialize MeanGradField using 2D data...')
                 MeanGrad = np.concatenate((MeanGrad[:,0:2],np.zeros(shape=[ngrid, 1]),
                                            MeanGrad[:,2:4],np.zeros(shape=[ngrid, 4])), axis=1)
@@ -124,6 +124,8 @@ class MeanGradField:
         self.VelGrad = MeanGrad
         self.StrainRate = self.CalcStrainRate
         self.Vorticity  = self.CalcVorticity
+        self.StrainRateMag = self.CalcStrainRateMag
+        self.VorticityMag = self.CalcVorticityMag
         
     def __str__(self):
         return("Mean gradient field of %.i grid points."%(self.ngrid))
@@ -152,6 +154,25 @@ class MeanGradField:
         Oyz = 0.5*(self.VelGrad[:,5]-self.VelGrad[:,7])
         O   = (np.array([Oxy,Oxz,Oyz])).T
         return(O)
+
+    @property
+    def CalcStrainRateMag(self):
+        '''
+        Purpose: calculate strain rate magnitude Smag
+        '''
+        Smag = np.sqrt(2)*np.sqrt(self.StrainRate[:,0]**2+self.StrainRate[:,1]**2+
+                self.StrainRate[:,2]**2+2*self.StrainRate[:,3]**2+2*self.StrainRate[:,4]**2+
+                2*self.StrainRate[:,5]**2)
+        return(Smag)
+
+    @property
+    def CalcVorticityMag(self):
+        '''
+        Purpose: calculate vorticity rate magnitude Omag
+        '''
+        Omag = 2*np.sqrt(self.Vorticity[:,0]**2+self.Vorticity[:,1]**2+
+                self.Vorticity[:,2]**2)
+        return(Omag)    
     
 class ReynoldsStressTensor:
     '''
@@ -316,7 +337,7 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
     Parameters
     ----------
     MeanGrad : MeanGradField Class.
-    EddyVisc : 1D numpy array, float. Dynamic eddy viscosity
+    EddyVisc : 1D numpy array, float. Kinematic eddy viscosity
     TKE      : 1D numpy array, float. Turbulence kinetic energy (default 0)
     Method   : string; 'Boussinesq'(default), 'QCR2000', 'QCR2013', 'QCR2013V'
     
@@ -385,6 +406,8 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
                         S21**2+S22**2+S23**2+
                         S31**2+S32**2+S33**2)*np.sqrt(2)
         RST[:,0] += ccr2*EddyVisc*S_mag
+        RST[:,1] += ccr2*EddyVisc*S_mag
+        RST[:,2] += ccr2*EddyVisc*S_mag
 
     elif (method == 'QCR2013V') and (np.sum(np.abs(TKE)) < 1e-9):
         # mimic the TKE term using QCR2013V
@@ -394,6 +417,8 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
                         O31**2+O32**2+O33**2)* \
                 (ugrad_mag+1e-12)/np.sqrt(2)
         RST[:,0] += ccr2*EddyVisc*W_mag
+        RST[:,1] += ccr2*EddyVisc*W_mag
+        RST[:,2] += ccr2*EddyVisc*W_mag
         
     else:
         # use user-input TKE term
@@ -405,7 +430,7 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
 
 def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     '''
-    Purpose: Calculate eddy viscosity based on Boussinesq assumption using 
+    Purpose: Calculate eddy viscosity based on constitutive relation using 
              Reynolds stress components and velocity gradients
     
     Parameters
@@ -416,7 +441,7 @@ def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     Method: string; 'Boussinesq', 'QCR2000', 'QCR2013', 'QCR2013V'(default)
     
     Return
-    EddyVisc: 1D numpy array, float. Calculated dynamic eddy viscosity
+    EddyVisc: 1D numpy array, float. Calculated kinematic eddy viscosity
     flag:     indicator of regions affected by limiters.
               0: no limiter; 1: S_ref applied; -1: EddyVisc=max{0,self} applied.
     '''

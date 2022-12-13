@@ -27,7 +27,7 @@ current_path = os.getcwd()
 parrent_path = os.path.dirname(current_path)
 TurbAna_path = parrent_path
 
-# SPOD library
+# TurbAna library
 sys.path.insert(0, TurbAna_path)
 import TurbAna
 
@@ -49,7 +49,7 @@ start_sec1 = time.time()
 # data path
 data_path = os.path.join(current_path, 'cooling_data')
 
-# option to save SPOD results
+# option to save TurbAna results
 save_fig  = False  # postprocess figs
 save_path = data_path
 
