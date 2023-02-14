@@ -161,8 +161,8 @@ class MeanGradField:
         Purpose: calculate strain rate magnitude Smag
         '''
         Smag = np.sqrt(2)*np.sqrt(self.StrainRate[:,0]**2+self.StrainRate[:,1]**2+
-                self.StrainRate[:,2]**2+2*self.StrainRate[:,3]**2+2*self.StrainRate[:,4]**2+
-                2*self.StrainRate[:,5]**2)
+               self.StrainRate[:,2]**2+2*self.StrainRate[:,3]**2+2*self.StrainRate[:,4]**2+
+               2*self.StrainRate[:,5]**2)
         return(Smag)
 
     @property
@@ -171,8 +171,90 @@ class MeanGradField:
         Purpose: calculate vorticity rate magnitude Omag
         '''
         Omag = 2*np.sqrt(self.Vorticity[:,0]**2+self.Vorticity[:,1]**2+
-                self.Vorticity[:,2]**2)
-        return(Omag)    
+               self.Vorticity[:,2]**2)
+        return(Omag)
+    
+    def CalcVelGradMag(self):
+        '''
+        Purpose: calculate the F-norm of the velocity gradient tensor
+        '''
+        ugradmag = np.sqrt(np.sum(self.VelGrad**2, axis=1))
+        return(ugradmag)
+    
+    def CalcTensorBasis(self):
+        '''
+        Purpose: calculate the tensor basis of Pope's "General Effective-Viscosity Hypothesis"
+                 (note: only linear and quadratic terms are included for now)
+        '''
+        # Sij
+        Sij = np.zeros(shape=[self.ngrid,3,3])
+        Sij[:,0,0] = self.StrainRate[:,0]
+        Sij[:,1,1] = self.StrainRate[:,1]
+        Sij[:,2,2] = self.StrainRate[:,2]
+        Sij[:,0,1] = self.StrainRate[:,3]
+        Sij[:,0,2] = self.StrainRate[:,4]
+        Sij[:,1,0] = Sij[:,0,1]
+        Sij[:,1,2] = self.StrainRate[:,5]
+        Sij[:,2,0] = Sij[:,0,2]
+        Sij[:,2,1] = Sij[:,1,2]
+        
+        # Oij
+        Oij = np.zeros(shape=[self.ngrid,3,3])
+        Oij[:,0,1] = self.Vorticity[:,0]
+        Oij[:,0,2] = self.Vorticity[:,1]
+        Oij[:,1,0] = -Oij[:,0,1]
+        Oij[:,1,2] = self.Vorticity[:,2]
+        Oij[:,2,0] = -Oij[:,0,2]
+        Oij[:,2,1] = -Oij[:,1,2]
+        
+        # lambda1, lambda2
+        lambda1,lambda2 = self.CalcTensorInvariant()
+        
+        # T1_ij=Sij
+        T1 = Sij
+        
+        # T2_ij=Sik*Okj-Oik*Skj
+        T2 = np.zeros(shape=[self.ngrid,3,3])
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    T2[:,i,j] += Sij[:,i,k]*Oij[:,k,j] - Oij[:,i,k]*Sij[:,k,j]
+        
+        # T3_ij=Sik*Skj-1/3*deltaij*Smn*Snm
+        T3 = np.zeros(shape=[self.ngrid,3,3])
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    T3[:,i,j] += Sij[:,i,k]*Sij[:,k,j]
+                    
+                if i==j:
+                    T3[:,i,j] -= lambda1/3
+                    
+        # T4_ij=Oik*Okj-1/3*deltaij*Omn*Onm
+        T4 = np.zeros(shape=[self.ngrid,3,3])
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    T4[:,i,j] += Oij[:,i,k]*Oij[:,k,j]
+                    
+                if i==j:
+                    T4[:,i,j] -= lambda2/3
+                        
+        return(T1,T2,T3,T4)
+    
+    def CalcTensorInvariant(self):
+        '''
+        Purpose: calculate the tensor invariants of Pope's "General Effective-Viscosity Hypothesis"
+                 (note: only second-order terms are included for now)
+        '''
+        # Sik*Ski
+        lambda1 = self.StrainRate[:,0]**2 + self.StrainRate[:,1]**2 + self.StrainRate[:,2]**2 + \
+                  2*self.StrainRate[:,3]**2 + 2*self.StrainRate[:,4]**2 + 2*self.StrainRate[:,5]**2
+        
+        # Oik*Oki
+        lambda2 = -2*np.sum(self.Vorticity**2, axis=1)
+        
+        return(lambda1,lambda2)
     
 class ReynoldsStressTensor:
     '''
