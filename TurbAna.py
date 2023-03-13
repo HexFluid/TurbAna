@@ -183,14 +183,14 @@ class MeanGradField:
     
     def CalcTensorBasis(self):
         '''
-        Purpose: calculate the tensor basis of Pope's "General Effective-Viscosity Hypothesis"
-                 (note: only linear and quadratic terms are included for now)
+        Purpose: calculate the tensor invariants and tensor basis of Pope's "General Effective-Viscosity Hypothesis"
         '''
         # Sij
+        S_trace = self.StrainRate[:,0]+self.StrainRate[:,1]+self.StrainRate[:,2]
         Sij = np.zeros(shape=[self.ngrid,3,3])
-        Sij[:,0,0] = self.StrainRate[:,0]
-        Sij[:,1,1] = self.StrainRate[:,1]
-        Sij[:,2,2] = self.StrainRate[:,2]
+        Sij[:,0,0] = self.StrainRate[:,0]-S_trace/3
+        Sij[:,1,1] = self.StrainRate[:,1]-S_trace/3
+        Sij[:,2,2] = self.StrainRate[:,2]-S_trace/3
         Sij[:,0,1] = self.StrainRate[:,3]
         Sij[:,0,2] = self.StrainRate[:,4]
         Sij[:,1,0] = Sij[:,0,1]
@@ -206,56 +206,44 @@ class MeanGradField:
         Oij[:,1,2] = self.Vorticity[:,2]
         Oij[:,2,0] = -Oij[:,0,2]
         Oij[:,2,1] = -Oij[:,1,2]
-        
-        # lambda1, lambda2
-        lambda1,lambda2 = self.CalcTensorInvariant()
-        
-        # T1_ij=Sij
-        T1 = Sij
-        
-        # T2_ij=Sik*Okj-Oik*Skj
-        T2 = np.zeros(shape=[self.ngrid,3,3])
-        for i in range(3):
-            for j in range(3):
-                for k in range(3):
-                    T2[:,i,j] += Sij[:,i,k]*Oij[:,k,j] - Oij[:,i,k]*Sij[:,k,j]
-        
-        # T3_ij=Sik*Skj-1/3*deltaij*Smn*Snm
-        T3 = np.zeros(shape=[self.ngrid,3,3])
-        for i in range(3):
-            for j in range(3):
-                for k in range(3):
-                    T3[:,i,j] += Sij[:,i,k]*Sij[:,k,j]
-                    
-                if i==j:
-                    T3[:,i,j] -= lambda1/3
-                    
-        # T4_ij=Oik*Okj-1/3*deltaij*Omn*Onm
-        T4 = np.zeros(shape=[self.ngrid,3,3])
-        for i in range(3):
-            for j in range(3):
-                for k in range(3):
-                    T4[:,i,j] += Oij[:,i,k]*Oij[:,k,j]
-                    
-                if i==j:
-                    T4[:,i,j] -= lambda2/3
-                        
-        return(T1,T2,T3,T4)
-    
-    def CalcTensorInvariant(self):
-        '''
-        Purpose: calculate the tensor invariants of Pope's "General Effective-Viscosity Hypothesis"
-                 (note: only second-order terms are included for now)
-        '''
-        # Sik*Ski
-        lambda1 = self.StrainRate[:,0]**2 + self.StrainRate[:,1]**2 + self.StrainRate[:,2]**2 + \
-                  2*self.StrainRate[:,3]**2 + 2*self.StrainRate[:,4]**2 + 2*self.StrainRate[:,5]**2
-        
-        # Oik*Oki
-        lambda2 = -2*np.sum(self.Vorticity**2, axis=1)
-        
-        return(lambda1,lambda2)
-    
+
+        # lambdas
+        lambdas=np.zeros(shape=[self.ngrid,5])
+        for i in range(self.ngrid):
+            lambdas[i, 0] = np.trace(np.dot(Sij[i, :, :], Sij[i, :, :]))
+            lambdas[i, 1] = np.trace(np.dot(Oij[i, :, :], Oij[i, :, :]))
+            lambdas[i, 2] = np.trace(np.dot(Sij[i, :, :], np.dot(Sij[i, :, :], Sij[i, :, :])))
+            lambdas[i, 3] = np.trace(np.dot(Oij[i, :, :], np.dot(Oij[i, :, :], Sij[i, :, :])))
+            lambdas[i, 4] = np.trace(np.dot(np.dot(Oij[i, :, :], Oij[i, :, :]), np.dot(Sij[i, :, :], Sij[i, :, :])))        
+
+        # Ts
+        Ts=np.zeros(shape=[10,self.ngrid,3,3])
+        for i in range(self.ngrid):
+            sij = Sij[i, :, :]
+            oij = Oij[i, :, :]
+            Ts[0, i, :, :] = sij
+            Ts[1, i, :, :] = np.dot(sij, oij) - np.dot(oij, sij)
+            Ts[2, i, :, :] = np.dot(sij, sij) - 1./3.*np.eye(3)*np.trace(np.dot(sij, sij))
+            Ts[3, i, :, :] = np.dot(oij, oij) - 1./3.*np.eye(3)*np.trace(np.dot(oij, oij))
+            Ts[4, i, :, :] = np.dot(oij, np.dot(sij, sij)) - np.dot(np.dot(sij, sij), oij)
+            Ts[5, i, :, :] = np.dot(oij, np.dot(oij, sij)) \
+                             + np.dot(sij, np.dot(oij, oij)) \
+                             - 2./3.*np.eye(3)*np.trace(np.dot(sij, np.dot(oij, oij)))
+            Ts[6, i, :, :] = np.dot(np.dot(oij, sij), np.dot(oij, oij)) - np.dot(np.dot(oij, oij), np.dot(sij, oij))
+            Ts[7, i, :, :] = np.dot(np.dot(sij, oij), np.dot(sij, sij)) - np.dot(np.dot(sij, sij), np.dot(oij, sij))
+            Ts[8, i, :, :] = np.dot(np.dot(oij, oij), np.dot(sij, sij)) \
+                             + np.dot(np.dot(sij, sij), np.dot(oij, oij)) \
+                             - 2./3.*np.eye(3)*np.trace(np.dot(np.dot(sij, sij), np.dot(oij, oij)))
+            Ts[9, i, :, :] = np.dot(np.dot(oij, np.dot(sij, sij)), np.dot(oij, oij)) \
+                             - np.dot(np.dot(oij, np.dot(oij, sij)), np.dot(sij, oij))
+
+            # Enforce zero trace for anisotropy
+            for j in range(9):
+                Ts[j, i, :, :] = Ts[j, i, :, :] - 1./3.*np.eye(3)*np.trace(Ts[j, i, :, :])      
+
+        return(lambdas,Ts)
+
+
 class ReynoldsStressTensor:
     '''
     Purpose: class of Reynolds stress tensor
