@@ -181,10 +181,18 @@ class MeanGradField:
         ugradmag = np.sqrt(np.sum(self.VelGrad**2, axis=1))
         return(ugradmag)
     
-    def CalcTensorBasis(self):
+    def CalcTensorBasis(self,nond_weight=False,cap=7,norm=False):
         '''
         Purpose: calculate the tensor invariants and tensor basis of Pope's "General Effective-Viscosity Hypothesis"
+
+        Parameters
+        ----------
+        nond_weight: 2D numpy array, float.
+                     nrow = ngrid (number of grid)
+                     ncol = 1 (weight)
+        cap        : min-max value of the non-dimensionalized S and O component, float.
         '''
+        
         # Sij
         S_trace = self.StrainRate[:,0]+self.StrainRate[:,1]+self.StrainRate[:,2]
         Sij = np.zeros(shape=[self.ngrid,3,3])
@@ -206,6 +214,22 @@ class MeanGradField:
         Oij[:,1,2] = self.Vorticity[:,2]
         Oij[:,2,0] = -Oij[:,0,2]
         Oij[:,2,1] = -Oij[:,1,2]
+        
+        # non-dimensionalize Sij and Oij
+        if type(nond_weight) != bool:
+            for k in range(self.ngrid):
+                Sij[k,:,:] = Sij[k,:,:]*nond_weight[k,0]
+                Oij[k,:,:] = Oij[k,:,:]*nond_weight[k,0]                        
+            
+            # min-max limiter of Sij and Oij
+            Sij[Sij > cap] = cap
+            Sij[Sij <-cap] =-cap
+            Oij[Oij > cap] = cap
+            Oij[Oij <-cap] =-cap
+            
+            # re-enforce trace zero for Sij
+            for k in range(self.ngrid):
+                Sij[k,:,:] = Sij[k,:,:] - np.eye(3)*np.trace(Sij[k,:,:])/3
 
         # lambdas
         lambdas=np.zeros(shape=[self.ngrid,5])
@@ -215,6 +239,25 @@ class MeanGradField:
             lambdas[i, 2] = np.trace(np.dot(Sij[i, :, :], np.dot(Sij[i, :, :], Sij[i, :, :])))
             lambdas[i, 3] = np.trace(np.dot(Oij[i, :, :], np.dot(Oij[i, :, :], Sij[i, :, :])))
             lambdas[i, 4] = np.trace(np.dot(np.dot(Oij[i, :, :], Oij[i, :, :]), np.dot(Sij[i, :, :], Sij[i, :, :])))        
+
+        # normalize lambdas
+        if norm == 'min-max':
+            lambdas = (lambdas-np.min(lambdas,axis=0))/(np.max(lambdas,axis=0)-np.min(lambdas,axis=0))
+        
+        elif norm == 'mean-std':
+            lambdas = (lambdas-np.mean(lambdas,axis=0))/np.std(lambdas,axis=0)
+            
+            # Caps the max value of the invariants after first normalization pass                                     
+            Icap = 2
+            for j in range(5):
+                nloop=0
+                while np.max(np.abs(lambdas[:,j]))>Icap:
+                    lambdas[:,j]=np.clip(lambdas[:,j],-Icap,Icap)
+                    lambdas[:,j]=(lambdas[:,j]-np.mean(lambdas[:,j]))/np.std(lambdas[:,j])
+                    nloop+=1
+                    if nloop>0:
+                        print("Max nloop reached during mean-std normalization!",nloop)
+                        break
 
         # Ts
         Ts=np.zeros(shape=[10,self.ngrid,3,3])
@@ -264,7 +307,7 @@ class ReynoldsStressTensor:
             if nvar == 4: # 2D data with uu,vv,ww,uv
                 print('Initialize ReynoldsStressTensor using 2D data...')
                 tau_ij = np.concatenate((tau_ij, np.zeros(shape=[ngrid, 2])), axis=1)
-            elif nvar == 6: # 3D data with 
+            elif nvar == 6: # 3D data with uu,vv,ww,uv,uw,vw
                 print('Initialize ReynoldsStressTensor using 3D data...')
             else:
                 raise ValueError
