@@ -62,12 +62,13 @@ DNS_Grid = h5f['grid'][:]         # grid point coordinates
 DNS_TurbStat = h5f['TurbStat'][:] # Reynolds stress components
 h5f.close()
 
+nskip = 10
 h5f  = h5py.File(os.path.join(data_path,'bstep_DDES.h5'),'r')
-DDES_Grid = h5f['grid'][:]         # grid point coordinates
-DDES_TurbStat = h5f['TurbStat'][:] # Reynolds stress components
-DDES_MeanFlow = h5f['MeanFlow'][:] # Mean flow fields
-DDES_MeanGrad = h5f['MeanGrad'][:] # Velocity gradients
-DDES_Flag     = h5f['FlagDES'][:]  # DES flags (shielding function, delta/H, FKH)
+DDES_Grid = h5f['grid'][::nskip,:]         # grid point coordinates
+DDES_TurbStat = h5f['TurbStat'][::nskip,:] # Reynolds stress components
+DDES_MeanFlow = h5f['MeanFlow'][::nskip,:] # Mean flow fields
+DDES_MeanGrad = h5f['MeanGrad'][::nskip,:] # Velocity gradients
+DDES_Flag     = h5f['FlagDES'][::nskip,:]  # DES flags (shielding function, delta/H, FKH)
 h5f.close()
 
 # Sec. 1 end time
@@ -336,6 +337,7 @@ cbar.ax.set_yticklabels(['$10^0$', '$10^1$', '$10^2$', '$10^3$'])
 if save_fig:
     plt.savefig(os.path.join(save_path,'sref=%.i'%S_ref+'_'+method+'_ViscRatio_contour.png'), dpi=300, bbox_inches='tight')
     plt.close()
+
 
 # -------------------------------------------------------------------------  
 # Sec. 5 end time

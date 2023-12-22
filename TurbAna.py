@@ -442,7 +442,7 @@ def cubic_root(data):
     root=root.reshape(data_shape)
     return root
 
-def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
+def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, omega=1, method='Boussinesq'):
     '''
     Purpose: Calculate Reynolds stress tensor based on a constitutive relation
              using velocity gradients, eddy viscosity and TKE
@@ -452,7 +452,8 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
     MeanGrad : MeanGradField Class.
     EddyVisc : 1D numpy array, float. Kinematic eddy viscosity
     TKE      : 1D numpy array, float. Turbulence kinetic energy (default 0)
-    Method   : string; 'Boussinesq'(default), 'QCR2000', 'QCR2013', 'QCR2013V'
+    omega    : 1D numpy array, float. Turbulence specific dissipation rate (default 1)
+    Method   : string; 'Boussinesq'(default), 'QCR2000', 'QCR2013', 'QCR2013V', 'EARSM2005-2D'
     
     Return
     
@@ -463,25 +464,28 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
     ng = EddyVisc.shape[0]
     RST = np.zeros(shape=[ng,6])
 
-    S_trace = MeanGrad.StrainRate[:,0]+MeanGrad.StrainRate[:,1]+MeanGrad.StrainRate[:,2]
-    S11 = MeanGrad.StrainRate[:,0]-S_trace/3
-    S22 = MeanGrad.StrainRate[:,1]-S_trace/3
-    S33 = MeanGrad.StrainRate[:,2]-S_trace/3
-    S12 = MeanGrad.StrainRate[:,3]
-    S13 = MeanGrad.StrainRate[:,4]
-    S23 = MeanGrad.StrainRate[:,5]
-    S21 = S12
-    S31 = S13
-    S32 = S23
-    
-    # Linear Boussinesq part of Reynolds stress    
-    RST[:,0] = -2*EddyVisc*S11
-    RST[:,1] = -2*EddyVisc*S22
-    RST[:,2] = -2*EddyVisc*S33
-    RST[:,3] = -2*EddyVisc*S12
-    RST[:,4] = -2*EddyVisc*S13
-    RST[:,5] = -2*EddyVisc*S23
-    
+    # Linear term
+    if method in ['Boussinesq','QCR2000','QCR2013','QCR2013V','EARSM2005-2D']:
+        # symmetric stress tensor
+        S_trace = MeanGrad.StrainRate[:,0]+MeanGrad.StrainRate[:,1]+MeanGrad.StrainRate[:,2]
+        S11 = MeanGrad.StrainRate[:,0]-S_trace/3
+        S22 = MeanGrad.StrainRate[:,1]-S_trace/3
+        S33 = MeanGrad.StrainRate[:,2]-S_trace/3
+        S12 = MeanGrad.StrainRate[:,3]
+        S13 = MeanGrad.StrainRate[:,4]
+        S23 = MeanGrad.StrainRate[:,5]
+        S21 = S12
+        S31 = S13
+        S32 = S23
+        
+        # Linear Boussinesq part of Reynolds stress    
+        RST[:,0] = -2*EddyVisc*S11
+        RST[:,1] = -2*EddyVisc*S22
+        RST[:,2] = -2*EddyVisc*S33
+        RST[:,3] = -2*EddyVisc*S12
+        RST[:,4] = -2*EddyVisc*S13
+        RST[:,5] = -2*EddyVisc*S23
+        
     # Quadratic terms
     if method in ['QCR2000','QCR2013','QCR2013V']:
         ccr1 = 0.3
@@ -510,14 +514,87 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
         delta_RST[:,5] = -ccr1*(O21*RST[:,4]+O23*RST[:,2]+\
                           O31*RST[:,3]+O32*RST[:,1])
         RST = RST+delta_RST
+    
+    elif method in ['EARSM2005-2D']:
+        Neq = 81/20
+        Cdiff = 2.2
+        betastar = 0.09
+        
+        # turbulence time scale
+        tt = 1/(omega+1e-12)/betastar
+        
+        # symmetric normalized stress tensor
+        S11 = tt*S11
+        S22 = tt*S22
+        S33 = tt*S33
+        S12 = tt*S12
+        S13 = tt*S13
+        S23 = tt*S23
+        S21 = S12
+        S31 = S13
+        S32 = S23
+        II_S = S11*S11+S12*S21+S13*S31+\
+               S21*S12+S22*S22+S23*S32+\
+               S31*S13+S32*S23+S33*S33
+
+        # antisymmetric normalized rotation tensor
+        O11 = 0
+        O22 = 0
+        O33 = 0
+        O12 = 2*MeanGrad.Vorticity[:,0]*tt
+        O13 = 2*MeanGrad.Vorticity[:,1]*tt
+        O23 = 2*MeanGrad.Vorticity[:,2]*tt
+        O21 = -O12
+        O31 = -O13
+        O32 = -O23
+        II_O = O11*O11+O12*O21+O13*O31+\
+               O21*O12+O22*O22+O23*O32+\
+               O31*O13+O32*O23+O33*O33
+               
+        # add quadratic terms
+        beta1eq = -6/5*Neq/(Neq**2-2*II_O)
+        A3p = 9/5+9/4*Cdiff*np.clip(1+beta1eq*II_S, 0, None)
+        P1 = (A3p**2/27+9/20*II_S-2/3*II_O)*A3p
+        P2 = P1**2-(A3p/9+9/10*II_S+2/3*II_O)**3
+        P2p_idx = P2>=0
+        P2n_idx = P2<0
+        Np = A3p/3+(P1+np.sqrt(np.abs(P2)))**(1/3)+np.sign(P1-np.sqrt(np.abs(P2)))*(np.abs(P1-np.sqrt(np.abs(P2))))**(1/3)
+        Nn = A3p/3+2*(P1**2+np.abs(P2))**(1/6)+np.cos(np.arccos(P1/(np.sqrt(P1**2+np.abs(P2))))/3)
+        N = np.zeros(shape=Np.shape)
+        N[P2p_idx] = Np[P2p_idx]
+        N[P2n_idx] = Nn[P2n_idx]
+        beta4_2D = -6/5/(N**2-2*II_O)
+        
+        # add quadratic terms
+        delta_RST = np.zeros(shape=[ng,6])
+        delta_RST[:,0] = S11*O11-O11*S11+\
+                         S12*O21-O12*S21+\
+                         S13*O31-O13*S31
+        delta_RST[:,1] = S21*O12-O21*S12+\
+                         S22*O22-O22*S22+\
+                         S23*O32-O23*S32
+        delta_RST[:,2] = S31*O13-O31*S13+\
+                         S32*O23-O32*S23+\
+                         S33*O33-O33*S33
+        delta_RST[:,3] = S11*O12-O11*S12+\
+                         S12*O22-O12*S22+\
+                         S13*O32-O13*S32
+        delta_RST[:,4] = S11*O13-O11*S13+\
+                         S12*O23-O12*S23+\
+                         S13*O33-O13*S33
+        delta_RST[:,5] = S21*O13-O21*S13+\
+                         S22*O23-O22*S23+\
+                         S23*O33-O23*S33
+        delta_RST = delta_RST*np.reshape(TKE, (len(TKE), 1))*np.reshape(beta4_2D, (len(beta4_2D), 1))
+        RST = RST+delta_RST
             
     # TKE diagonal term
     if (method == 'QCR2013') and (np.sum(np.abs(TKE)) < 1e-9):
         # mimic the TKE term using QCR2013
         ccr2 = 2.5
         S_mag = np.sqrt(S11**2+S12**2+S13**2+
-                        S21**2+S22**2+S23**2+
-                        S31**2+S32**2+S33**2)*np.sqrt(2)
+                        S12**2+S22**2+S23**2+
+                        S13**2+S23**2+S33**2)*np.sqrt(2)
         RST[:,0] += ccr2*EddyVisc*S_mag
         RST[:,1] += ccr2*EddyVisc*S_mag
         RST[:,2] += ccr2*EddyVisc*S_mag
@@ -540,6 +617,51 @@ def calc_ReynoldsStressTensor(MeanGrad, EddyVisc, TKE=0, method='Boussinesq'):
         RST[:,2] += 2/3*TKE
     
     return RST
+
+def calc_EddyVisc_general(RST, MeanGrad, method='QCR2013V',inisol=None):
+    '''
+    Purpose: Calculate eddy viscosity based on constitutive relation using 
+             Reynolds stress components and velocity gradients (general version
+             based on optimization algorithm; not numerically efficient)
+    
+    Parameters
+    ----------
+    RST: ReynoldsStressTensor Class.
+    MeanGrad: MeanGradField Class.
+    Method: string; 'Boussinesq', 'QCR2000', 'QCR2013', 'QCR2013V'(default), 'EARSM2005'
+    
+    Return
+    EddyVisc: 1D numpy array, float. Calculated kinematic eddy viscosity
+    '''
+    
+    from scipy.optimize import minimize
+
+    def func(nu_t_i,RST_i,MeanGrad_i,method):
+        Recon_RST_i = calc_ReynoldsStressTensor(MeanGrad_i, nu_t_i, TKE=RST_i.TKE, 
+                        omega=RST_i.TKE/np.clip(nu_t_i,1e-9,None), method=method)
+        weight=np.column_stack((np.ones((1, 3)), np.full((1, 3), 2)))
+        f = np.sum((Recon_RST_i-RST_i.Components)**2*weight)
+        return f
+   
+    EddyVisc = []
+    ng = RST.ngrid
+    for i in range(ng):
+        if np.sum(RST.Components[i,0:3])<0.01:
+            EddyVisc.append(1e-6)
+        else:
+            RST_i = ReynoldsStressTensor(np.reshape(RST.Components[i,:], (1, 6)))
+            MeanGrad_i = MeanGradField(np.reshape(MeanGrad.VelGrad[i,:], (1, 9)))
+            try:
+                nu_t_ini_i = inisol[i]
+            except:
+                nu_t_ini_i = 1e-5
+            nu_t_i = minimize(func, nu_t_ini_i, method='L-BFGS-B', args=(RST_i, MeanGrad_i, method),
+                              options={'maxiter': 1000, 'eps': 1e-6})
+            EddyVisc.append(nu_t_i['x'][0])
+    
+    EddyVisc = np.array(EddyVisc)
+
+    return EddyVisc
 
 def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     '''
@@ -771,9 +893,9 @@ def calc_EddyVisc(RST, MeanGrad, S_ref=100, method='QCR2013V'):
     
     return EddyVisc, flag
 
-def calc_Nutilda(nu_t,nu_l):
+def calc_Nutilde(nu_t,nu_l):
     '''
-    Purpose: Calculate nu_tilda, the variable of the SA transport equation, from
+    Purpose: Calculate nu_tilde, the variable of the SA transport equation, from
              eddy viscosity nu_t and laminar viscosity nu_l
     
     Parameters
@@ -782,22 +904,22 @@ def calc_Nutilda(nu_t,nu_l):
     nu_l: 1D numpy array, float.
     
     Return
-    nu_tilda: 1D numpy array, float.
+    nu_tilde: 1D numpy array, float.
     '''
     from scipy.optimize import fsolve
 
-    def func(nu_tilda):
-        xx = nu_tilda/nu_li
+    def func(nu_tilde):
+        xx = nu_tilde/nu_li
         f = xx**4/(xx**3+7.1**3) - nu_ti/nu_li
         return f
     
-    nu_tilda = []
+    nu_tilde = []
     for i in range(nu_t.shape[0]):
         nu_ti = nu_t[i]
         nu_li = nu_l[i]
-        nu_tilda.append(fsolve(func, nu_ti))
+        nu_tilde.append(fsolve(func, nu_ti))
     
-    return(np.array(nu_tilda)[:,0])
+    return(np.array(nu_tilde)[:,0])
 
 def plot_Lumley_tri(method='w/o data', coors=None):
     '''
